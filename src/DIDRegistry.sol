@@ -10,6 +10,7 @@ contract DIDRegistry is Ownable {
     mapping(address => string) public addressToDID;
     mapping(string => address) public didToAddress;
     mapping(string => bytes32) public didToDocumentHash;
+    mapping(bytes32 => bool) public documentHashExists;
 
     event IdentityRegistered(address indexed userAddress, string indexed didString, bytes32 documentHash);
 
@@ -40,10 +41,12 @@ contract DIDRegistry is Ownable {
     {
         require(bytes(addressToDID[userAddress]).length == 0, "Address already registered");
         require(didToAddress[didString] == address(0), "DID already registered");
+        require(!documentHashExists[documentHash], "Document hash already registered");
 
         addressToDID[userAddress] = didString;
         didToAddress[didString] = userAddress;
         didToDocumentHash[didString] = documentHash;
+        documentHashExists[documentHash] = true;
 
         emit IdentityRegistered(userAddress, didString, documentHash);
     }

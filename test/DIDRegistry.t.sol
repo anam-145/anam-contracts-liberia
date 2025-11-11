@@ -119,6 +119,19 @@ contract DIDRegistryTest is Test {
         registry.registerIdentity(userAddress2, didString, documentHash);
     }
 
+    function test_RegisterIdentityRevertsWhenRegisteringSameDocumentHashTwice() public {
+        address userAddress1 = address(0x5678);
+        address userAddress2 = address(0x9ABC);
+        string memory didString1 = "did:anam:undp-lr:user:12345";
+        string memory didString2 = "did:anam:undp-lr:user:67890";
+        bytes32 documentHash = keccak256("document");
+
+        registry.registerIdentity(userAddress1, didString1, documentHash);
+
+        vm.expectRevert();
+        registry.registerIdentity(userAddress2, didString2, documentHash);
+    }
+
     function test_GetDIDByAddressReturnsCorrectDIDForRegisteredAddress() public {
         address userAddress = address(0x5678);
         string memory didString = "did:anam:undp-lr:user:12345";
