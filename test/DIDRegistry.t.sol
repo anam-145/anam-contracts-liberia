@@ -271,4 +271,13 @@ contract DIDRegistryTest is Test {
         assertEq(registry.didToAddress(did2), user2, "Second reverse mapping should work");
         assertEq(registry.didToAddress(did3), user3, "Third reverse mapping should work");
     }
+
+    function test_RegisterIdentityRevertsWhenDIDStringIsEmpty() public {
+        address userAddress = address(0x5678);
+        string memory emptyDID = "";
+        bytes32 documentHash = keccak256("document");
+
+        vm.expectRevert();
+        registry.registerIdentity(userAddress, emptyDID, documentHash);
+    }
 }

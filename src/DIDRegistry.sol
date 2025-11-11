@@ -39,6 +39,7 @@ contract DIDRegistry is Ownable {
         public
         onlyRole(ISSUER_ROLE)
     {
+        require(bytes(didString).length > 0, "DID string cannot be empty");
         require(bytes(addressToDID[userAddress]).length == 0, "Address already registered");
         require(didToAddress[didString] == address(0), "DID already registered");
         require(!documentHashExists[documentHash], "Document hash already registered");
