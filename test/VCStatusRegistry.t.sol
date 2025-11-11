@@ -448,4 +448,11 @@ contract VCStatusRegistryTest is Test {
         assertEq(uint8(registry.vcStatus(vc2)), uint8(VCStatusRegistry.VCStatus.ACTIVE), "Second VC should be ACTIVE");
         assertEq(uint8(registry.vcStatus(vc3)), uint8(VCStatusRegistry.VCStatus.ACTIVE), "Third VC should be ACTIVE");
     }
+
+    function test_RegisterVCRevertsWhenVCIdIsEmpty() public {
+        string memory emptyVCId = "";
+
+        vm.expectRevert();
+        registry.registerVC(emptyVCId);
+    }
 }

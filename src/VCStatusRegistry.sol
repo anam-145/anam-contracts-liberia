@@ -44,6 +44,7 @@ contract VCStatusRegistry is Ownable {
     }
 
     function registerVC(string memory vcId) public onlyRole(ISSUER_ROLE) {
+        require(bytes(vcId).length > 0, "VC ID cannot be empty");
         require(vcStatus[vcId] == VCStatus.NULL, "VC already registered");
         vcStatus[vcId] = VCStatus.ACTIVE;
         emit VCRegistered(vcId);
