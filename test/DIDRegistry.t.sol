@@ -245,4 +245,30 @@ contract DIDRegistryTest is Test {
 
         assertTrue(registry.hasRole(issuerRole, issuer), "Address should still have ISSUER role after failed revoke");
     }
+
+    function test_MultipleDIDsCanBeRegisteredInSequence() public {
+        address user1 = address(0x1111);
+        address user2 = address(0x2222);
+        address user3 = address(0x3333);
+
+        string memory did1 = "did:anam:undp-lr:user:1";
+        string memory did2 = "did:anam:undp-lr:user:2";
+        string memory did3 = "did:anam:undp-lr:user:3";
+
+        bytes32 hash1 = keccak256("doc1");
+        bytes32 hash2 = keccak256("doc2");
+        bytes32 hash3 = keccak256("doc3");
+
+        registry.registerIdentity(user1, did1, hash1);
+        registry.registerIdentity(user2, did2, hash2);
+        registry.registerIdentity(user3, did3, hash3);
+
+        assertEq(registry.addressToDID(user1), did1, "First DID should be registered correctly");
+        assertEq(registry.addressToDID(user2), did2, "Second DID should be registered correctly");
+        assertEq(registry.addressToDID(user3), did3, "Third DID should be registered correctly");
+
+        assertEq(registry.didToAddress(did1), user1, "First reverse mapping should work");
+        assertEq(registry.didToAddress(did2), user2, "Second reverse mapping should work");
+        assertEq(registry.didToAddress(did3), user3, "Third reverse mapping should work");
+    }
 }
