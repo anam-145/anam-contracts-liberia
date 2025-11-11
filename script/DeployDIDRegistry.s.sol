@@ -5,7 +5,7 @@ import "forge-std/Script.sol";
 import "../src/DIDRegistry.sol";
 
 contract DeployDIDRegistry is Script {
-    function run() external {
+    function run() external returns (DIDRegistry) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
@@ -14,10 +14,10 @@ contract DeployDIDRegistry is Script {
 
         vm.stopBroadcast();
 
-        console.log("===========================================");
-        console.log("DIDRegistry deployed to:", address(registry));
-        console.log("Deployer (owner):", msg.sender);
-        console.log("Chain ID:", block.chainid);
-        console.log("===========================================");
+        console.log("DIDRegistry deployed at:", address(registry));
+        console.log("Deployer has ISSUER_ROLE:", registry.hasRole(registry.ISSUER_ROLE(), msg.sender));
+        console.log("Owner:", registry.owner());
+
+        return registry;
     }
 }
