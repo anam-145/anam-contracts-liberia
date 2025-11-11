@@ -280,4 +280,22 @@ contract DIDRegistryTest is Test {
         vm.expectRevert();
         registry.registerIdentity(userAddress, emptyDID, documentHash);
     }
+
+    function test_RegisterIdentityRevertsWhenUserAddressIsZero() public {
+        address zeroAddress = address(0);
+        string memory didString = "did:anam:undp-lr:user:12345";
+        bytes32 documentHash = keccak256("document");
+
+        vm.expectRevert();
+        registry.registerIdentity(zeroAddress, didString, documentHash);
+    }
+
+    function test_RegisterIdentityRevertsWhenDocumentHashIsZero() public {
+        address userAddress = address(0x5678);
+        string memory didString = "did:anam:undp-lr:user:12345";
+        bytes32 zeroHash = bytes32(0);
+
+        vm.expectRevert();
+        registry.registerIdentity(userAddress, didString, zeroHash);
+    }
 }
