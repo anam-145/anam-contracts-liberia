@@ -82,9 +82,9 @@ contract LiberiaEventTest is Test {
     }
 
     function test_SetSystemAdminAsOwner() public view {
-        bytes32 defaultAdminRole = eventContract.DEFAULT_ADMIN_ROLE();
+        bytes32 systemAdminRole = eventContract.SYSTEM_ADMIN_ROLE();
 
-        assertTrue(eventContract.hasRole(defaultAdminRole, systemAdmin));
+        assertTrue(eventContract.hasRole(systemAdminRole, systemAdmin));
     }
 
     function test_AllowSystemAdminToRegisterAParticipant() public {

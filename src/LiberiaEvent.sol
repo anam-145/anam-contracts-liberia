@@ -39,8 +39,9 @@ contract LiberiaEvent is AccessControl {
         maxParticipants = _maxParticipants;
         maxTotalPayments = _maxTotalPayments;
 
-        _grantRole(DEFAULT_ADMIN_ROLE, _systemAdmin);
         _grantRole(SYSTEM_ADMIN_ROLE, _systemAdmin);
+        _setRoleAdmin(APPROVER_ROLE, SYSTEM_ADMIN_ROLE);
+        _setRoleAdmin(VERIFIER_ROLE, SYSTEM_ADMIN_ROLE);
 
         for (uint256 i = 0; i < _approvers.length; i++) {
             _grantRole(APPROVER_ROLE, _approvers[i]);

@@ -15,8 +15,8 @@ contract EventFactory is AccessControl {
     constructor(address _usdcAddress) {
         require(_usdcAddress != address(0), "Invalid USDC address");
         usdcAddress = _usdcAddress;
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SYSTEM_ADMIN_ROLE, msg.sender);
+        _setRoleAdmin(SYSTEM_ADMIN_ROLE, SYSTEM_ADMIN_ROLE);
     }
 
     function createEvent(

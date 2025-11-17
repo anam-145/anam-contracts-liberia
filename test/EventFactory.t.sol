@@ -25,7 +25,7 @@ contract EventFactoryTest is Test {
     }
 
     function test_GrantDefaultAdminRoleToDeployer() public view {
-        assertTrue(factory.hasRole(factory.DEFAULT_ADMIN_ROLE(), deployer));
+        assertTrue(factory.hasRole(factory.SYSTEM_ADMIN_ROLE(), deployer));
     }
 
     function test_RevertWhenCreatingEventWithZeroUSDCAddress() public {
