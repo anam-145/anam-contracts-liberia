@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
-import "../src/EventFactory.sol";
-import "../src/LiberiaEvent.sol";
+import {Test} from "forge-std/Test.sol";
+import {EventFactory} from "../src/EventFactory.sol";
+import {LiberiaEvent} from "../src/LiberiaEvent.sol";
 
 contract EventFactoryTest is Test {
     EventFactory public factory;
@@ -45,15 +45,7 @@ contract EventFactoryTest is Test {
         verifiers[0] = address(0x2222);
 
         vm.expectRevert("Invalid time range");
-        factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
-        );
+        factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers);
     }
 
     function test_RevertWhenCreatingEventWithZeroAmountPerDay() public {
@@ -68,15 +60,7 @@ contract EventFactoryTest is Test {
         verifiers[0] = address(0x2222);
 
         vm.expectRevert("Invalid amount per day");
-        factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
-        );
+        factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers);
     }
 
     function test_RevertWhenCreatingEventWithZeroMaxParticipants() public {
@@ -91,15 +75,7 @@ contract EventFactoryTest is Test {
         verifiers[0] = address(0x2222);
 
         vm.expectRevert("Invalid max participants");
-        factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
-        );
+        factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers);
     }
 
     function test_RevertWhenCreatingEventWithZeroMaxTotalPayments() public {
@@ -114,15 +90,7 @@ contract EventFactoryTest is Test {
         verifiers[0] = address(0x2222);
 
         vm.expectRevert("Invalid max total payments");
-        factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
-        );
+        factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers);
     }
 
     function test_CreateNewEventContractWithValidParameters() public {
@@ -137,13 +105,7 @@ contract EventFactoryTest is Test {
         verifiers[0] = address(0x2222);
 
         address eventAddress = factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
+            startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers
         );
 
         assertTrue(eventAddress != address(0));
@@ -163,15 +125,7 @@ contract EventFactoryTest is Test {
         vm.expectEmit(false, true, false, false);
         emit EventCreated(address(0), deployer);
 
-        factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
-        );
+        factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers);
     }
 
     event EventCreated(address indexed eventAddress, address indexed creator);
@@ -188,13 +142,7 @@ contract EventFactoryTest is Test {
         verifiers[0] = address(0x2222);
 
         address eventAddress = factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
+            startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers
         );
 
         assertEq(factory.getEventsLength(), 1);
@@ -214,13 +162,7 @@ contract EventFactoryTest is Test {
         verifiers[0] = address(0x3333);
 
         address eventAddress = factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
+            startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers
         );
 
         LiberiaEvent eventContract = LiberiaEvent(eventAddress);
@@ -243,13 +185,7 @@ contract EventFactoryTest is Test {
         verifiers[1] = address(0x3333);
 
         address eventAddress = factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
+            startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers
         );
 
         LiberiaEvent eventContract = LiberiaEvent(eventAddress);
@@ -280,13 +216,7 @@ contract EventFactoryTest is Test {
         // Verify the system admin can create events
         vm.prank(systemAdmin);
         address eventAddress = factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
+            startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers
         );
 
         assertTrue(eventAddress != address(0));
@@ -308,15 +238,7 @@ contract EventFactoryTest is Test {
 
         vm.prank(nonAdmin);
         vm.expectRevert();
-        factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
-        );
+        factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers);
     }
 
     function test_CreateMultipleEventsIndependently() public {
@@ -325,15 +247,8 @@ contract EventFactoryTest is Test {
         address[] memory verifiers1 = new address[](1);
         verifiers1[0] = address(0x2222);
 
-        address eventAddress1 = factory.createEvent(
-            block.timestamp,
-            block.timestamp + 7 days,
-            100 ether,
-            50,
-            3,
-            approvers1,
-            verifiers1
-        );
+        address eventAddress1 =
+            factory.createEvent(block.timestamp, block.timestamp + 7 days, 100 ether, 50, 3, approvers1, verifiers1);
 
         address[] memory approvers2 = new address[](1);
         approvers2[0] = address(0x3333);
@@ -341,13 +256,7 @@ contract EventFactoryTest is Test {
         verifiers2[0] = address(0x4444);
 
         address eventAddress2 = factory.createEvent(
-            block.timestamp + 1 days,
-            block.timestamp + 14 days,
-            200 ether,
-            100,
-            5,
-            approvers2,
-            verifiers2
+            block.timestamp + 1 days, block.timestamp + 14 days, 200 ether, 100, 5, approvers2, verifiers2
         );
 
         // Verify both events exist and are different
@@ -392,13 +301,7 @@ contract EventFactoryTest is Test {
         verifiers[0] = address(0x2222);
 
         address returnedAddress = factory.createEvent(
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            maxTotalPayments,
-            approvers,
-            verifiers
+            startTime, endTime, amountPerDay, maxParticipants, maxTotalPayments, approvers, verifiers
         );
 
         // Verify the returned address is a valid LiberiaEvent contract
