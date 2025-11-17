@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./LiberiaEvent.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {LiberiaEvent} from "./LiberiaEvent.sol";
 
 contract EventFactory is AccessControl {
     bytes32 public constant SYSTEM_ADMIN_ROLE = keccak256("SYSTEM_ADMIN_ROLE");

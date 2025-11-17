@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract DIDRegistry is Ownable {
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
