@@ -3,37 +3,47 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {LiberiaEvent} from "../src/LiberiaEvent.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract MockUSDC is ERC20 {
+    constructor() ERC20("Mock USDC", "USDC") {
+        _mint(msg.sender, 1000000 * 10 ** 18);
+    }
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
 
 contract LiberiaEventTest is Test {
     LiberiaEvent public eventContract;
-    address public usdcAddress;
+    MockUSDC public usdc;
     address public systemAdmin;
 
     event ParticipantRegistered(address indexed participant, address indexed admin);
     event ParticipantRemoved(address indexed participant, address indexed admin);
     event CheckInVerified(address indexed participant, address indexed verifier, uint256 indexed day);
+    event PaymentApproved(address indexed participant, address indexed approver, uint256 indexed day, uint256 amount);
 
     function setUp() public {
-        usdcAddress = address(0x1234);
+        usdc = new MockUSDC();
         systemAdmin = address(this);
 
         uint256 startTime = block.timestamp;
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 50;
-        uint256 maxTotalPayments = 3;
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](1);
         verifiers[0] = address(0x2222);
 
         eventContract = new LiberiaEvent(
-            usdcAddress,
+            address(usdc),
             startTime,
             endTime,
             amountPerDay,
             maxParticipants,
-            maxTotalPayments,
             approvers,
             verifiers,
             systemAdmin
@@ -41,7 +51,7 @@ contract LiberiaEventTest is Test {
     }
 
     function test_InitializeEventContractWithCorrectUSDCAddress() public view {
-        assertEq(eventContract.usdcAddress(), usdcAddress);
+        assertEq(eventContract.usdcAddress(), address(usdc));
     }
 
     function test_InitializeEventContractWithCorrectTimeRange() public view {
@@ -62,12 +72,6 @@ contract LiberiaEventTest is Test {
         uint256 expectedMaxParticipants = 50;
 
         assertEq(eventContract.maxParticipants(), expectedMaxParticipants);
-    }
-
-    function test_InitializeEventContractWithCorrectMaxTotalPayments() public view {
-        uint256 expectedMaxTotalPayments = 3;
-
-        assertEq(eventContract.maxTotalPayments(), expectedMaxTotalPayments);
     }
 
     function test_GrantApproverRoleToApproversList() public view {
@@ -362,5 +366,197 @@ contract LiberiaEventTest is Test {
         vm.prank(systemAdmin);
         eventContract.verifyCheckIn(participant, verifier, block.timestamp + 2 days);
         assertEq(eventContract.getCheckInCount(participant), 3);
+    }
+
+    function test_AllowApproverToApprovePaymentForVerifiedParticipant() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+
+        // Fund the event contract with USDC
+        usdc.transfer(address(eventContract), 1000 ether);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver, block.timestamp);
+
+        assertEq(
+            uint256(eventContract.getParticipantStatusForDay(participant, block.timestamp)),
+            uint256(2) // COMPLETED = 2
+        );
+    }
+
+    function test_EmitPaymentApprovedEventWhenPaymentIsApproved() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+        uint256 expectedAmount = 100 ether;
+
+        // Fund the event contract with USDC
+        usdc.transfer(address(eventContract), 1000 ether);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+
+        uint256 normalizedDay = (block.timestamp / 1 days) * 1 days;
+
+        vm.expectEmit(true, true, true, true, address(eventContract));
+        emit PaymentApproved(participant, approver, normalizedDay, expectedAmount);
+
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver, block.timestamp);
+    }
+
+    function test_RevertWhenNonApproverTriesToApprovePayment() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+        address nonApprover = address(0x8888);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+
+        vm.prank(systemAdmin);
+        vm.expectRevert("Approver does not have APPROVER_ROLE");
+        eventContract.approvePayment(participant, nonApprover, block.timestamp);
+    }
+
+    function test_RevertWhenParticipantIsNotInVerifiedStatus() public {
+        address participant = address(0x9999);
+        address approver = address(0x1111);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        vm.prank(systemAdmin);
+        vm.expectRevert("Participant not in VERIFIED status");
+        eventContract.approvePayment(participant, approver, block.timestamp);
+    }
+
+    function test_TransferCorrectAmountOfUSDCToParticipant() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+        uint256 amountPerDay = 100 ether;
+
+        // Fund the event contract with USDC
+        usdc.transfer(address(eventContract), 1000 ether);
+
+        // Register participant
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // Verify check-in
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+
+        // Record balances before payment
+        uint256 participantBalanceBefore = usdc.balanceOf(participant);
+        uint256 contractBalanceBefore = usdc.balanceOf(address(eventContract));
+
+        // Approve payment
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver, block.timestamp);
+
+        // Check balances after payment
+        uint256 participantBalanceAfter = usdc.balanceOf(participant);
+        uint256 contractBalanceAfter = usdc.balanceOf(address(eventContract));
+
+        assertEq(participantBalanceAfter, participantBalanceBefore + amountPerDay);
+        assertEq(contractBalanceAfter, contractBalanceBefore - amountPerDay);
+    }
+
+    function test_RevertWhenContractHasInsufficientUSDCBalance() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+
+        // Do NOT fund the event contract (insufficient balance)
+
+        // Register participant
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // Verify check-in
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+
+        // Try to approve payment without sufficient USDC balance
+        vm.prank(systemAdmin);
+        vm.expectRevert();
+        eventContract.approvePayment(participant, approver, block.timestamp);
+    }
+
+    function test_TrackTotalPaymentsMadeToEachParticipant() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+
+        // Fund the event contract with USDC
+        usdc.transfer(address(eventContract), 1000 ether);
+
+        // Register participant
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // Initially, payment count should be 0
+        assertEq(eventContract.getPaymentCount(participant), 0);
+
+        // First payment (day 0)
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver, block.timestamp);
+        assertEq(eventContract.getPaymentCount(participant), 1);
+
+        // Second payment (day 1)
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp + 1 days);
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver, block.timestamp + 1 days);
+        assertEq(eventContract.getPaymentCount(participant), 2);
+
+        // Third payment (day 2)
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp + 2 days);
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver, block.timestamp + 2 days);
+        assertEq(eventContract.getPaymentCount(participant), 3);
+    }
+
+    function test_PreventSameParticipantFromReceivingPaymentTwiceOnSameDay() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+
+        // Fund the event contract with USDC
+        usdc.transfer(address(eventContract), 1000 ether);
+
+        // Register participant
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // Verify check-in
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+
+        // First payment approval
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver, block.timestamp);
+
+        // Try to approve payment again for the same day - should revert
+        vm.prank(systemAdmin);
+        vm.expectRevert("Participant not in VERIFIED status");
+        eventContract.approvePayment(participant, approver, block.timestamp);
     }
 }

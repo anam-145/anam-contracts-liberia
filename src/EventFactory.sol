@@ -24,14 +24,12 @@ contract EventFactory is AccessControl {
         uint256 endTime,
         uint256 amountPerDay,
         uint256 maxParticipants,
-        uint256 maxTotalPayments,
         address[] memory approvers,
         address[] memory verifiers
     ) external onlyRole(SYSTEM_ADMIN_ROLE) returns (address) {
         require(endTime > startTime, "Invalid time range");
         require(amountPerDay > 0, "Invalid amount per day");
         require(maxParticipants > 0, "Invalid max participants");
-        require(maxTotalPayments > 0, "Invalid max total payments");
 
         LiberiaEvent newEvent = new LiberiaEvent(
             usdcAddress,
@@ -39,7 +37,6 @@ contract EventFactory is AccessControl {
             endTime,
             amountPerDay,
             maxParticipants,
-            maxTotalPayments,
             approvers,
             verifiers,
             msg.sender

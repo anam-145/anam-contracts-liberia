@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract LiberiaEvent is AccessControl {
     enum ParticipantStatus {
@@ -19,16 +20,17 @@ contract LiberiaEvent is AccessControl {
     uint256 public endTime;
     uint256 public amountPerDay;
     uint256 public maxParticipants;
-    uint256 public maxTotalPayments;
 
     mapping(address => bool) public isParticipant;
     uint256 public participantCount;
     mapping(address => mapping(uint256 => ParticipantStatus)) private participantStatusForDay;
     mapping(address => uint256) private checkInCount;
+    mapping(address => uint256) private paymentCount;
 
     event ParticipantRegistered(address indexed participant, address indexed admin);
     event ParticipantRemoved(address indexed participant, address indexed admin);
     event CheckInVerified(address indexed participant, address indexed verifier, uint256 indexed day);
+    event PaymentApproved(address indexed participant, address indexed approver, uint256 indexed day, uint256 amount);
 
     constructor(
         address _usdcAddress,
@@ -36,7 +38,6 @@ contract LiberiaEvent is AccessControl {
         uint256 _endTime,
         uint256 _amountPerDay,
         uint256 _maxParticipants,
-        uint256 _maxTotalPayments,
         address[] memory _approvers,
         address[] memory _verifiers,
         address _systemAdmin
@@ -46,7 +47,6 @@ contract LiberiaEvent is AccessControl {
         endTime = _endTime;
         amountPerDay = _amountPerDay;
         maxParticipants = _maxParticipants;
-        maxTotalPayments = _maxTotalPayments;
 
         _grantRole(SYSTEM_ADMIN_ROLE, _systemAdmin);
         _setRoleAdmin(APPROVER_ROLE, SYSTEM_ADMIN_ROLE);
@@ -113,5 +113,27 @@ contract LiberiaEvent is AccessControl {
 
     function getCheckInCount(address participant) external view returns (uint256) {
         return checkInCount[participant];
+    }
+
+    function approvePayment(address participant, address approver, uint256 day) external onlyRole(SYSTEM_ADMIN_ROLE) {
+        require(hasRole(APPROVER_ROLE, approver), "Approver does not have APPROVER_ROLE");
+
+        uint256 normalizedDay = (day / 1 days) * 1 days;
+
+        require(
+            participantStatusForDay[participant][normalizedDay] == ParticipantStatus.VERIFIED,
+            "Participant not in VERIFIED status"
+        );
+
+        participantStatusForDay[participant][normalizedDay] = ParticipantStatus.COMPLETED;
+        paymentCount[participant]++;
+
+        IERC20(usdcAddress).transfer(participant, amountPerDay);
+
+        emit PaymentApproved(participant, approver, normalizedDay, amountPerDay);
+    }
+
+    function getPaymentCount(address participant) external view returns (uint256) {
+        return paymentCount[participant];
     }
 }
