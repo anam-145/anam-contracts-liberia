@@ -32,14 +32,7 @@ contract EventFactory is AccessControl {
         require(maxParticipants > 0, "Invalid max participants");
 
         LiberiaEvent newEvent = new LiberiaEvent(
-            usdcAddress,
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            approvers,
-            verifiers,
-            msg.sender
+            usdcAddress, startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, msg.sender
         );
 
         address eventAddress = address(newEvent);

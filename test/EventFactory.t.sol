@@ -52,7 +52,7 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 0; // Zero amount
         uint256 maxParticipants = 50;
-        
+
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](1);
@@ -67,7 +67,7 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 0; // Zero max participants
-        
+
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](1);
@@ -82,15 +82,14 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 50;
-        
+
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](1);
         verifiers[0] = address(0x2222);
 
-        address eventAddress = factory.createEvent(
-            startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers
-        );
+        address eventAddress =
+            factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers);
 
         assertTrue(eventAddress != address(0));
     }
@@ -100,7 +99,7 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 50;
-        
+
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](1);
@@ -119,15 +118,14 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 50;
-        
+
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](1);
         verifiers[0] = address(0x2222);
 
-        address eventAddress = factory.createEvent(
-            startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers
-        );
+        address eventAddress =
+            factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers);
 
         assertEq(factory.getEventsLength(), 1);
         assertEq(factory.events(0), eventAddress);
@@ -138,16 +136,15 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 50;
-        
+
         address[] memory approvers = new address[](2);
         approvers[0] = address(0x1111);
         approvers[1] = address(0x2222);
         address[] memory verifiers = new address[](1);
         verifiers[0] = address(0x3333);
 
-        address eventAddress = factory.createEvent(
-            startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers
-        );
+        address eventAddress =
+            factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers);
 
         LiberiaEvent eventContract = LiberiaEvent(eventAddress);
         bytes32 approverRole = eventContract.APPROVER_ROLE();
@@ -161,16 +158,15 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 50;
-        
+
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](2);
         verifiers[0] = address(0x2222);
         verifiers[1] = address(0x3333);
 
-        address eventAddress = factory.createEvent(
-            startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers
-        );
+        address eventAddress =
+            factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers);
 
         LiberiaEvent eventContract = LiberiaEvent(eventAddress);
         bytes32 verifierRole = eventContract.VERIFIER_ROLE();
@@ -184,7 +180,7 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 50;
-        
+
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](1);
@@ -199,9 +195,8 @@ contract EventFactoryTest is Test {
 
         // Verify the system admin can create events
         vm.prank(systemAdmin);
-        address eventAddress = factory.createEvent(
-            startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers
-        );
+        address eventAddress =
+            factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers);
 
         assertTrue(eventAddress != address(0));
     }
@@ -211,7 +206,7 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 50;
-        
+
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](1);
@@ -278,15 +273,14 @@ contract EventFactoryTest is Test {
         uint256 endTime = block.timestamp + 7 days;
         uint256 amountPerDay = 100 ether;
         uint256 maxParticipants = 50;
-        
+
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
         address[] memory verifiers = new address[](1);
         verifiers[0] = address(0x2222);
 
-        address returnedAddress = factory.createEvent(
-            startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers
-        );
+        address returnedAddress =
+            factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers);
 
         // Verify the returned address is a valid LiberiaEvent contract
         assertTrue(returnedAddress != address(0));
