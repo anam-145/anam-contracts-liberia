@@ -317,9 +317,8 @@ contract EventFactoryTest is Test {
         address[] memory verifiers = new address[](1);
         verifiers[0] = address(0x2222);
 
-        address eventAddress = testFactory.createEvent(
-            startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers
-        );
+        address eventAddress =
+            testFactory.createEvent(startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers);
 
         LiberiaEvent eventContract = LiberiaEvent(eventAddress);
 
@@ -374,9 +373,8 @@ contract EventFactoryTest is Test {
         address[] memory verifiers = new address[](1);
         verifiers[0] = address(0x2222);
 
-        address eventAddress = testFactory.createEvent(
-            block.timestamp, block.timestamp + 7 days, 100 ether, 50, approvers, verifiers
-        );
+        address eventAddress =
+            testFactory.createEvent(block.timestamp, block.timestamp + 7 days, 100 ether, 50, approvers, verifiers);
 
         LiberiaEvent eventContract = LiberiaEvent(eventAddress);
 
@@ -450,9 +448,8 @@ contract EventFactoryTest is Test {
         address[] memory verifiers = new address[](1);
         verifiers[0] = address(0x2222);
 
-        address eventAddress = testFactory.createEvent(
-            block.timestamp, block.timestamp + 7 days, 100 ether, 50, approvers, verifiers
-        );
+        address eventAddress =
+            testFactory.createEvent(block.timestamp, block.timestamp + 7 days, 100 ether, 50, approvers, verifiers);
 
         LiberiaEvent eventContract = LiberiaEvent(eventAddress);
 
@@ -473,8 +470,7 @@ contract EventFactoryTest is Test {
         assertEq(eventContract.getPaymentCount(participant), 1);
         assertEq(usdc.balanceOf(participant), 100 ether);
         assertTrue(
-            eventContract.getParticipantStatusForDay(participant, day1)
-                == LiberiaEvent.ParticipantStatus.COMPLETED
+            eventContract.getParticipantStatusForDay(participant, day1) == LiberiaEvent.ParticipantStatus.COMPLETED
         );
 
         // Day 2: Check-in and payment
@@ -487,8 +483,7 @@ contract EventFactoryTest is Test {
         assertEq(eventContract.getPaymentCount(participant), 2);
         assertEq(usdc.balanceOf(participant), 200 ether);
         assertTrue(
-            eventContract.getParticipantStatusForDay(participant, day2)
-                == LiberiaEvent.ParticipantStatus.COMPLETED
+            eventContract.getParticipantStatusForDay(participant, day2) == LiberiaEvent.ParticipantStatus.COMPLETED
         );
 
         // Day 3: Check-in and payment
@@ -501,20 +496,17 @@ contract EventFactoryTest is Test {
         assertEq(eventContract.getPaymentCount(participant), 3);
         assertEq(usdc.balanceOf(participant), 300 ether);
         assertTrue(
-            eventContract.getParticipantStatusForDay(participant, day3)
-                == LiberiaEvent.ParticipantStatus.COMPLETED
+            eventContract.getParticipantStatusForDay(participant, day3) == LiberiaEvent.ParticipantStatus.COMPLETED
         );
 
         // Verify Day 1 status is still COMPLETED (not affected by later days)
         assertTrue(
-            eventContract.getParticipantStatusForDay(participant, day1)
-                == LiberiaEvent.ParticipantStatus.COMPLETED
+            eventContract.getParticipantStatusForDay(participant, day1) == LiberiaEvent.ParticipantStatus.COMPLETED
         );
 
         // Verify Day 2 status is still COMPLETED
         assertTrue(
-            eventContract.getParticipantStatusForDay(participant, day2)
-                == LiberiaEvent.ParticipantStatus.COMPLETED
+            eventContract.getParticipantStatusForDay(participant, day2) == LiberiaEvent.ParticipantStatus.COMPLETED
         );
 
         // Verify contract balance was reduced correctly
@@ -534,9 +526,8 @@ contract EventFactoryTest is Test {
         address[] memory verifiersA = new address[](1);
         verifiersA[0] = address(0x2222);
 
-        address eventAddressA = testFactory.createEvent(
-            block.timestamp, block.timestamp + 7 days, 100 ether, 50, approversA, verifiersA
-        );
+        address eventAddressA =
+            testFactory.createEvent(block.timestamp, block.timestamp + 7 days, 100 ether, 50, approversA, verifiersA);
 
         // Create Event B with different approvers/verifiers
         address[] memory approversB = new address[](1);
@@ -544,9 +535,8 @@ contract EventFactoryTest is Test {
         address[] memory verifiersB = new address[](1);
         verifiersB[0] = address(0x4444);
 
-        address eventAddressB = testFactory.createEvent(
-            block.timestamp, block.timestamp + 7 days, 200 ether, 30, approversB, verifiersB
-        );
+        address eventAddressB =
+            testFactory.createEvent(block.timestamp, block.timestamp + 7 days, 200 ether, 30, approversB, verifiersB);
 
         LiberiaEvent eventA = LiberiaEvent(eventAddressA);
         LiberiaEvent eventB = LiberiaEvent(eventAddressB);
