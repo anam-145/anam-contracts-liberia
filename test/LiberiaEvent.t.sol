@@ -39,14 +39,7 @@ contract LiberiaEventTest is Test {
         verifiers[0] = address(0x2222);
 
         eventContract = new LiberiaEvent(
-            address(usdc),
-            startTime,
-            endTime,
-            amountPerDay,
-            maxParticipants,
-            approvers,
-            verifiers,
-            systemAdmin
+            address(usdc), startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, systemAdmin
         );
     }
 
@@ -646,4 +639,115 @@ contract LiberiaEventTest is Test {
             uint256(2) // COMPLETED
         );
     }
+
+    function test_AllowSystemAdminToGrantApproverRole() public {
+        address newApprover = address(0x8888);
+        bytes32 approverRole = eventContract.APPROVER_ROLE();
+
+        // Verify newApprover doesn't have APPROVER_ROLE initially
+        assertFalse(eventContract.hasRole(approverRole, newApprover));
+
+        // Grant APPROVER_ROLE to newApprover
+        vm.prank(systemAdmin);
+        eventContract.grantRole(approverRole, newApprover);
+
+        // Verify newApprover now has APPROVER_ROLE
+        assertTrue(eventContract.hasRole(approverRole, newApprover));
+    }
+
+    function test_AllowSystemAdminToRevokeApproverRole() public {
+        address approver = address(0x1111); // Already has APPROVER_ROLE from setUp
+        bytes32 approverRole = eventContract.APPROVER_ROLE();
+
+        // Verify approver has APPROVER_ROLE initially
+        assertTrue(eventContract.hasRole(approverRole, approver));
+
+        // Revoke APPROVER_ROLE from approver
+        vm.prank(systemAdmin);
+        eventContract.revokeRole(approverRole, approver);
+
+        // Verify approver no longer has APPROVER_ROLE
+        assertFalse(eventContract.hasRole(approverRole, approver));
+    }
+
+    function test_AllowSystemAdminToGrantVerifierRole() public {
+        address newVerifier = address(0x9999);
+        bytes32 verifierRole = eventContract.VERIFIER_ROLE();
+
+        // Verify newVerifier doesn't have VERIFIER_ROLE initially
+        assertFalse(eventContract.hasRole(verifierRole, newVerifier));
+
+        // Grant VERIFIER_ROLE to newVerifier
+        vm.prank(systemAdmin);
+        eventContract.grantRole(verifierRole, newVerifier);
+
+        // Verify newVerifier now has VERIFIER_ROLE
+        assertTrue(eventContract.hasRole(verifierRole, newVerifier));
+    }
+
+    function test_AllowSystemAdminToRevokeVerifierRole() public {
+        address verifier = address(0x2222); // Already has VERIFIER_ROLE from setUp
+        bytes32 verifierRole = eventContract.VERIFIER_ROLE();
+
+        // Verify verifier has VERIFIER_ROLE initially
+        assertTrue(eventContract.hasRole(verifierRole, verifier));
+
+        // Revoke VERIFIER_ROLE from verifier
+        vm.prank(systemAdmin);
+        eventContract.revokeRole(verifierRole, verifier);
+
+        // Verify verifier no longer has VERIFIER_ROLE
+        assertFalse(eventContract.hasRole(verifierRole, verifier));
+    }
+
+    function test_EmitRoleGrantedEventWhenRoleIsGranted() public {
+        address newApprover = address(0x7777);
+        bytes32 approverRole = eventContract.APPROVER_ROLE();
+
+        // Expect RoleGranted event to be emitted
+        vm.expectEmit(true, true, true, true);
+        emit RoleGranted(approverRole, newApprover, systemAdmin);
+
+        // Grant APPROVER_ROLE to newApprover
+        vm.prank(systemAdmin);
+        eventContract.grantRole(approverRole, newApprover);
+    }
+
+    function test_EmitRoleRevokedEventWhenRoleIsRevoked() public {
+        address approver = address(0x1111); // Already has APPROVER_ROLE from setUp
+        bytes32 approverRole = eventContract.APPROVER_ROLE();
+
+        // Expect RoleRevoked event to be emitted
+        vm.expectEmit(true, true, true, true);
+        emit RoleRevoked(approverRole, approver, systemAdmin);
+
+        // Revoke APPROVER_ROLE from approver
+        vm.prank(systemAdmin);
+        eventContract.revokeRole(approverRole, approver);
+    }
+
+    function test_RevertWhenNonSystemAdminTriesToGrantRole() public {
+        address nonAdmin = address(0x5555);
+        address newApprover = address(0x6666);
+        bytes32 approverRole = eventContract.APPROVER_ROLE();
+
+        // Try to grant APPROVER_ROLE as non-admin - should revert
+        vm.prank(nonAdmin);
+        vm.expectRevert();
+        eventContract.grantRole(approverRole, newApprover);
+    }
+
+    function test_RevertWhenNonSystemAdminTriesToRevokeRole() public {
+        address nonAdmin = address(0x5555);
+        address existingApprover = address(0x1111);
+        bytes32 approverRole = eventContract.APPROVER_ROLE();
+
+        // Try to revoke APPROVER_ROLE from existing approver as non-admin - should revert
+        vm.prank(nonAdmin);
+        vm.expectRevert();
+        eventContract.revokeRole(approverRole, existingApprover);
+    }
+
+    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
+    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
 }
