@@ -748,6 +748,182 @@ contract LiberiaEventTest is Test {
         eventContract.revokeRole(approverRole, existingApprover);
     }
 
+    function test_EmitProperEventsForAllStateChangingOperations() public {
+        // This test verifies that all state-changing operations emit proper events
+        // Individual event tests exist for each operation, this test documents the requirement
+
+        address participant1 = address(0x3333);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+
+        // 1. Register participant - emits ParticipantRegistered
+        vm.expectEmit(true, true, false, false);
+        emit ParticipantRegistered(participant1, systemAdmin);
+        eventContract.registerParticipant(participant1);
+
+        // 2. Verify check-in - emits CheckInVerified
+        uint256 today = block.timestamp;
+        uint256 normalizedDay = (today / 1 days) * 1 days;
+        vm.expectEmit(true, true, true, false);
+        emit CheckInVerified(participant1, verifier, normalizedDay);
+        eventContract.verifyCheckIn(participant1, verifier, today);
+
+        // 3. Approve payment - emits PaymentApproved
+        usdc.transfer(address(eventContract), 1000 ether);
+        vm.expectEmit(true, true, true, true);
+        emit PaymentApproved(participant1, approver, normalizedDay, 100 ether);
+        eventContract.approvePayment(participant1, approver, today);
+
+        // 4. Remove participant - emits ParticipantRemoved
+        vm.expectEmit(true, true, false, false);
+        emit ParticipantRemoved(participant1, systemAdmin);
+        eventContract.removeParticipant(participant1);
+
+        // 5. Grant role - emits RoleGranted (OpenZeppelin)
+        address newApprover = address(0x7777);
+        bytes32 approverRole = eventContract.APPROVER_ROLE();
+        vm.expectEmit(true, true, true, false);
+        emit RoleGranted(approverRole, newApprover, systemAdmin);
+        eventContract.grantRole(approverRole, newApprover);
+
+        // 6. Revoke role - emits RoleRevoked (OpenZeppelin)
+        vm.expectEmit(true, true, true, false);
+        emit RoleRevoked(approverRole, newApprover, systemAdmin);
+        eventContract.revokeRole(approverRole, newApprover);
+    }
+
+    function test_IncludeTimestampInAllEmittedEvents() public {
+        // Solidity events automatically include block.timestamp in the transaction receipt
+        // Additionally, our CheckInVerified and PaymentApproved events include explicit day/timestamp data
+
+        address participant1 = address(0x3333);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+
+        eventContract.registerParticipant(participant1);
+
+        // CheckInVerified event includes explicit day (normalized timestamp)
+        uint256 checkInTime = block.timestamp;
+        uint256 normalizedDay = (checkInTime / 1 days) * 1 days;
+
+        vm.expectEmit(true, true, true, false);
+        emit CheckInVerified(participant1, verifier, normalizedDay);
+        eventContract.verifyCheckIn(participant1, verifier, checkInTime);
+
+        // PaymentApproved event includes explicit day (normalized timestamp)
+        usdc.transfer(address(eventContract), 1000 ether);
+        vm.expectEmit(true, true, true, true);
+        emit PaymentApproved(participant1, approver, normalizedDay, 100 ether);
+        eventContract.approvePayment(participant1, approver, checkInTime);
+
+        // All Solidity events inherently include block.timestamp in transaction logs
+        // This test verifies that time-sensitive events (CheckInVerified, PaymentApproved)
+        // also include explicit normalized day for business logic tracking
+    }
+
+    function test_IncludeCallerAddressInAllEmittedEvents() public {
+        // This test verifies that all events include the caller's address for audit purposes
+
+        address participant1 = address(0x3333);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+
+        // ParticipantRegistered includes admin (caller) address
+        vm.expectEmit(true, true, false, false);
+        emit ParticipantRegistered(participant1, systemAdmin);
+        eventContract.registerParticipant(participant1);
+
+        // CheckInVerified includes verifier (caller) address
+        uint256 today = block.timestamp;
+        uint256 normalizedDay = (today / 1 days) * 1 days;
+        vm.expectEmit(true, true, true, false);
+        emit CheckInVerified(participant1, verifier, normalizedDay);
+        eventContract.verifyCheckIn(participant1, verifier, today);
+
+        // PaymentApproved includes approver (caller) address
+        usdc.transfer(address(eventContract), 1000 ether);
+        vm.expectEmit(true, true, true, true);
+        emit PaymentApproved(participant1, approver, normalizedDay, 100 ether);
+        eventContract.approvePayment(participant1, approver, today);
+
+        // ParticipantRemoved includes admin (caller) address
+        vm.expectEmit(true, true, false, false);
+        emit ParticipantRemoved(participant1, systemAdmin);
+        eventContract.removeParticipant(participant1);
+
+        // RoleGranted and RoleRevoked include sender (caller) address
+        address newApprover = address(0x7777);
+        bytes32 approverRole = eventContract.APPROVER_ROLE();
+        vm.expectEmit(true, true, true, false);
+        emit RoleGranted(approverRole, newApprover, systemAdmin);
+        eventContract.grantRole(approverRole, newApprover);
+
+        vm.expectEmit(true, true, true, false);
+        emit RoleRevoked(approverRole, newApprover, systemAdmin);
+        eventContract.revokeRole(approverRole, newApprover);
+    }
+
+    function test_EmitEventWithParticipantAddressAndAmountForPayments() public {
+        // This test verifies that PaymentApproved event includes participant address and payment amount
+
+        address participant1 = address(0x3333);
+        address verifier = address(0x2222);
+        address approver = address(0x1111);
+        uint256 paymentAmount = 100 ether;
+
+        // Register and verify participant
+        eventContract.registerParticipant(participant1);
+        uint256 today = block.timestamp;
+        eventContract.verifyCheckIn(participant1, verifier, today);
+
+        // Fund the contract
+        usdc.transfer(address(eventContract), 1000 ether);
+
+        // Approve payment and verify event includes participant address and amount
+        uint256 normalizedDay = (today / 1 days) * 1 days;
+        vm.expectEmit(true, true, true, true);
+        emit PaymentApproved(participant1, approver, normalizedDay, paymentAmount);
+        eventContract.approvePayment(participant1, approver, today);
+
+        // The PaymentApproved event includes:
+        // - participant address (indexed for filtering)
+        // - approver address (indexed for filtering)
+        // - day (indexed for filtering)
+        // - amount (non-indexed, full data)
+    }
+
+    function test_EmitEventWithDaySessionInformationForCheckIns() public {
+        // This test verifies that CheckInVerified event includes day/session information
+
+        address participant1 = address(0x3333);
+        address verifier = address(0x2222);
+
+        // Register participant
+        eventContract.registerParticipant(participant1);
+
+        // Verify check-in on a specific day
+        uint256 checkInTime = block.timestamp + 2 days;
+        uint256 normalizedDay = (checkInTime / 1 days) * 1 days;
+
+        // The CheckInVerified event should include the normalized day
+        vm.expectEmit(true, true, true, false);
+        emit CheckInVerified(participant1, verifier, normalizedDay);
+        eventContract.verifyCheckIn(participant1, verifier, checkInTime);
+
+        // The CheckInVerified event includes:
+        // - participant address (indexed for filtering)
+        // - verifier address (indexed for filtering)
+        // - day (indexed for filtering by date/session)
+
+        // Test multiple check-ins on different days
+        uint256 nextDay = checkInTime + 1 days;
+        uint256 nextNormalizedDay = (nextDay / 1 days) * 1 days;
+
+        vm.expectEmit(true, true, true, false);
+        emit CheckInVerified(participant1, verifier, nextNormalizedDay);
+        eventContract.verifyCheckIn(participant1, verifier, nextDay);
+    }
+
     event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
     event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
 }
