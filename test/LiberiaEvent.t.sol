@@ -559,4 +559,43 @@ contract LiberiaEventTest is Test {
         vm.expectRevert("Participant not in VERIFIED status");
         eventContract.approvePayment(participant, approver, block.timestamp);
     }
+
+    function test_AllowBatchPaymentApprovalForMultipleParticipants() public {
+        address approver = address(0x1111);
+        address verifier = address(0x2222);
+        uint256 day = block.timestamp;
+
+        // Create 3 participants
+        address[] memory participants = new address[](3);
+        participants[0] = address(0x9991);
+        participants[1] = address(0x9992);
+        participants[2] = address(0x9993);
+
+        // Fund contract with enough USDC for 3 payments
+        usdc.mint(address(eventContract), 300 ether);
+
+        // Register all participants
+        vm.prank(systemAdmin);
+        eventContract.registerParticipants(participants);
+
+        // Verify check-in for all participants
+        for (uint256 i = 0; i < participants.length; i++) {
+            vm.prank(systemAdmin);
+            eventContract.verifyCheckIn(participants[i], verifier, day);
+        }
+
+        // Batch approve payments
+        vm.prank(systemAdmin);
+        eventContract.batchApprovePayments(participants, approver, day);
+
+        // Verify all participants received payment
+        for (uint256 i = 0; i < participants.length; i++) {
+            assertEq(
+                uint256(eventContract.getParticipantStatusForDay(participants[i], day)),
+                uint256(2) // COMPLETED
+            );
+            assertEq(usdc.balanceOf(participants[i]), 100 ether);
+            assertEq(eventContract.getPaymentCount(participants[i]), 1);
+        }
+    }
 }

@@ -133,6 +133,28 @@ contract LiberiaEvent is AccessControl {
         emit PaymentApproved(participant, approver, normalizedDay, amountPerDay);
     }
 
+    function batchApprovePayments(address[] memory participants, address approver, uint256 day)
+        external
+        onlyRole(SYSTEM_ADMIN_ROLE)
+    {
+        require(hasRole(APPROVER_ROLE, approver), "Approver does not have APPROVER_ROLE");
+        uint256 normalizedDay = (day / 1 days) * 1 days;
+
+        for (uint256 i = 0; i < participants.length; i++) {
+            require(
+                participantStatusForDay[participants[i]][normalizedDay] == ParticipantStatus.VERIFIED,
+                "Participant not in VERIFIED status"
+            );
+
+            participantStatusForDay[participants[i]][normalizedDay] = ParticipantStatus.COMPLETED;
+            paymentCount[participants[i]]++;
+
+            IERC20(usdcAddress).transfer(participants[i], amountPerDay);
+
+            emit PaymentApproved(participants[i], approver, normalizedDay, amountPerDay);
+        }
+    }
+
     function getPaymentCount(address participant) external view returns (uint256) {
         return paymentCount[participant];
     }
