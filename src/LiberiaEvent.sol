@@ -72,6 +72,8 @@ contract LiberiaEvent is AccessControl {
 
     function _registerParticipant(address participant) private {
         require(participant != address(0), "Invalid participant address");
+        require(!hasRole(APPROVER_ROLE, participant), "Approvers cannot be registered as participants");
+        require(!hasRole(VERIFIER_ROLE, participant), "Verifiers cannot be registered as participants");
         require(participantCount < maxParticipants, "Max participants reached");
         isParticipant[participant] = true;
         participantCount++;

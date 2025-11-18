@@ -598,4 +598,52 @@ contract LiberiaEventTest is Test {
             assertEq(eventContract.getPaymentCount(participants[i]), 1);
         }
     }
+
+    function test_RevertWhenApproverTriesToRegisterThemselvesAsParticipant() public {
+        address approver = address(0x1111);
+
+        // Try to register approver as participant - should revert
+        vm.prank(systemAdmin);
+        vm.expectRevert("Approvers cannot be registered as participants");
+        eventContract.registerParticipant(approver);
+    }
+
+    function test_RevertWhenVerifierTriesToRegisterThemselvesAsParticipant() public {
+        address verifier = address(0x2222);
+
+        // Try to register verifier as participant - should revert
+        vm.prank(systemAdmin);
+        vm.expectRevert("Verifiers cannot be registered as participants");
+        eventContract.registerParticipant(verifier);
+    }
+
+    function test_AllowParticipantWhoIsNotApproverOrVerifierToReceivePayment() public {
+        address approver = address(0x1111);
+        address verifier = address(0x2222);
+        address participant = address(0x9999); // Regular participant with no roles
+        uint256 day = block.timestamp;
+
+        // Register regular participant (should succeed)
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // Fund the contract
+        usdc.mint(address(eventContract), 100 ether);
+
+        // Verify check-in for the participant
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, day);
+
+        // Approve payment for the participant (should succeed)
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver, day);
+
+        // Verify participant received payment
+        assertEq(usdc.balanceOf(participant), 100 ether);
+        assertEq(eventContract.getPaymentCount(participant), 1);
+        assertEq(
+            uint256(eventContract.getParticipantStatusForDay(participant, day)),
+            uint256(2) // COMPLETED
+        );
+    }
 }
