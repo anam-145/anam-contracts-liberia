@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
-import "../src/VCStatusRegistry.sol";
+import {Test} from "forge-std/Test.sol";
+import {VCStatusRegistry} from "../src/VCStatusRegistry.sol";
 
 contract VCStatusRegistryTest is Test {
     VCStatusRegistry public registry;
