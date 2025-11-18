@@ -592,6 +592,13 @@ contract LiberiaEventTest is Test {
         }
     }
 
+    function test_RevertWhenSystemAdminTriesToRegisterThemselvesAsParticipant() public {
+        // Try to register system admin as participant - should revert
+        vm.prank(systemAdmin);
+        vm.expectRevert("System admins cannot be registered as participants");
+        eventContract.registerParticipant(systemAdmin);
+    }
+
     function test_RevertWhenApproverTriesToRegisterThemselvesAsParticipant() public {
         address approver = address(0x1111);
 
