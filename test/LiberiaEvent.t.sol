@@ -11,6 +11,7 @@ contract LiberiaEventTest is Test {
 
     event ParticipantRegistered(address indexed participant, address indexed admin);
     event ParticipantRemoved(address indexed participant, address indexed admin);
+    event CheckInVerified(address indexed participant, address indexed verifier, uint256 indexed day);
 
     function setUp() public {
         usdcAddress = address(0x1234);
@@ -217,5 +218,149 @@ contract LiberiaEventTest is Test {
         assertEq(eventContract.participantCount(), 1);
 
         vm.stopPrank();
+    }
+
+    function test_AllowVerifierToVerifyCheckInForRegisteredParticipant() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+
+        assertTrue(eventContract.isVerifiedForDay(participant, block.timestamp));
+    }
+
+    function test_EmitCheckInVerifiedEventWhenCheckInIsVerified() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // Calculate normalized day (00:00:00 UTC of that day)
+        uint256 normalizedDay = (block.timestamp / 1 days) * 1 days;
+
+        vm.expectEmit(true, true, true, false, address(eventContract));
+        emit CheckInVerified(participant, verifier, normalizedDay);
+
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+    }
+
+    function test_RevertWhenNonVerifierTriesToVerifyCheckIn() public {
+        address participant = address(0x9999);
+        address nonVerifier = address(0x8888);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        vm.prank(systemAdmin);
+        vm.expectRevert("Verifier does not have VERIFIER_ROLE");
+        eventContract.verifyCheckIn(participant, nonVerifier, block.timestamp);
+    }
+
+    function test_RevertWhenVerifyingCheckInForUnregisteredParticipant() public {
+        address unregisteredParticipant = address(0x9999);
+        address verifier = address(0x2222);
+
+        vm.prank(systemAdmin);
+        vm.expectRevert("Participant not registered");
+        eventContract.verifyCheckIn(unregisteredParticipant, verifier, block.timestamp);
+    }
+
+    function test_RevertWhenVerifyingCheckInBeforeEventStartTime() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // Try to verify check-in before event start time
+        uint256 beforeStartTime = block.timestamp - 1;
+        vm.prank(systemAdmin);
+        vm.expectRevert("Check-in outside event time range");
+        eventContract.verifyCheckIn(participant, verifier, beforeStartTime);
+    }
+
+    function test_RevertWhenVerifyingCheckInAfterEventEndTime() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // Try to verify check-in after event end time (startTime + 7 days + 1)
+        uint256 afterEndTime = block.timestamp + 7 days + 1;
+        vm.prank(systemAdmin);
+        vm.expectRevert("Check-in outside event time range");
+        eventContract.verifyCheckIn(participant, verifier, afterEndTime);
+    }
+
+    function test_RevertWhenParticipantAlreadyCheckedInForSameDay() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // First check-in for the day (e.g., 9:00 AM)
+        uint256 morningTime = block.timestamp;
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, morningTime);
+
+        // Try to check in again for the same day (e.g., 3:00 PM - 6 hours later)
+        uint256 afternoonTime = block.timestamp + 6 hours;
+        vm.prank(systemAdmin);
+        vm.expectRevert("Participant already checked in for this day");
+        eventContract.verifyCheckIn(participant, verifier, afternoonTime);
+    }
+
+    function test_SetParticipantStatusToVerifiedForTheDay() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        uint256 day = block.timestamp;
+
+        // Before check-in, participant should not be verified
+        assertFalse(eventContract.isVerifiedForDay(participant, day));
+
+        // Verify check-in
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, day);
+
+        // After check-in, participant should be verified for that day
+        assertTrue(eventContract.isVerifiedForDay(participant, day));
+    }
+
+    function test_TrackCheckInCountPerParticipant() public {
+        address participant = address(0x9999);
+        address verifier = address(0x2222);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant);
+
+        // Initially, check-in count should be 0
+        assertEq(eventContract.getCheckInCount(participant), 0);
+
+        // First check-in
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        assertEq(eventContract.getCheckInCount(participant), 1);
+
+        // Second check-in (next day)
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp + 1 days);
+        assertEq(eventContract.getCheckInCount(participant), 2);
+
+        // Third check-in (two days later)
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier, block.timestamp + 2 days);
+        assertEq(eventContract.getCheckInCount(participant), 3);
     }
 }

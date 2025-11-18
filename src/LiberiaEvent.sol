@@ -4,6 +4,12 @@ pragma solidity ^0.8.20;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract LiberiaEvent is AccessControl {
+    enum ParticipantStatus {
+        NULL,
+        VERIFIED,
+        COMPLETED
+    }
+
     bytes32 public constant SYSTEM_ADMIN_ROLE = keccak256("SYSTEM_ADMIN_ROLE");
     bytes32 public constant APPROVER_ROLE = keccak256("APPROVER_ROLE");
     bytes32 public constant VERIFIER_ROLE = keccak256("VERIFIER_ROLE");
@@ -17,9 +23,12 @@ contract LiberiaEvent is AccessControl {
 
     mapping(address => bool) public isParticipant;
     uint256 public participantCount;
+    mapping(address => mapping(uint256 => ParticipantStatus)) private participantStatusForDay;
+    mapping(address => uint256) private checkInCount;
 
     event ParticipantRegistered(address indexed participant, address indexed admin);
     event ParticipantRemoved(address indexed participant, address indexed admin);
+    event CheckInVerified(address indexed participant, address indexed verifier, uint256 indexed day);
 
     constructor(
         address _usdcAddress,
@@ -74,5 +83,35 @@ contract LiberiaEvent is AccessControl {
         isParticipant[participant] = false;
         participantCount--;
         emit ParticipantRemoved(participant, msg.sender);
+    }
+
+    function verifyCheckIn(address participant, address verifier, uint256 day) external onlyRole(SYSTEM_ADMIN_ROLE) {
+        require(hasRole(VERIFIER_ROLE, verifier), "Verifier does not have VERIFIER_ROLE");
+        require(isParticipant[participant], "Participant not registered");
+        require(day >= startTime && day <= endTime, "Check-in outside event time range");
+
+        uint256 normalizedDay = (day / 1 days) * 1 days;
+
+        require(
+            participantStatusForDay[participant][normalizedDay] == ParticipantStatus.NULL,
+            "Participant already checked in for this day"
+        );
+        participantStatusForDay[participant][normalizedDay] = ParticipantStatus.VERIFIED;
+        checkInCount[participant]++;
+        emit CheckInVerified(participant, verifier, normalizedDay);
+    }
+
+    function isVerifiedForDay(address participant, uint256 day) external view returns (bool) {
+        uint256 normalizedDay = (day / 1 days) * 1 days;
+        return participantStatusForDay[participant][normalizedDay] == ParticipantStatus.VERIFIED;
+    }
+
+    function getParticipantStatusForDay(address participant, uint256 day) external view returns (ParticipantStatus) {
+        uint256 normalizedDay = (day / 1 days) * 1 days;
+        return participantStatusForDay[participant][normalizedDay];
+    }
+
+    function getCheckInCount(address participant) external view returns (uint256) {
+        return checkInCount[participant];
     }
 }
