@@ -89,7 +89,7 @@ contract LiberiaEventTest is Test {
         address participant = address(0x9999);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         assertTrue(eventContract.isParticipant(participant));
     }
@@ -101,7 +101,7 @@ contract LiberiaEventTest is Test {
         emit ParticipantRegistered(participant, systemAdmin);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
     }
 
     function test_RevertWhenNonSystemAdminTriesToRegisterParticipant() public {
@@ -110,13 +110,13 @@ contract LiberiaEventTest is Test {
 
         vm.prank(nonAdmin);
         vm.expectRevert();
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
     }
 
     function test_RevertWhenRegisteringZeroAddressAsParticipant() public {
         vm.prank(systemAdmin);
         vm.expectRevert("Invalid participant address");
-        eventContract.registerParticipant(address(0));
+        eventContract.registerParticipant(address(0), systemAdmin);
     }
 
     function test_RevertWhenParticipantCountExceedsMaxParticipants() public {
@@ -124,12 +124,12 @@ contract LiberiaEventTest is Test {
         // Register 50 participants
         vm.startPrank(systemAdmin);
         for (uint256 i = 1; i <= 50; i++) {
-            eventContract.registerParticipant(address(uint160(i)));
+            eventContract.registerParticipant(address(uint160(i)), systemAdmin);
         }
 
         // Try to register the 51st participant, should revert
         vm.expectRevert("Max participants reached");
-        eventContract.registerParticipant(address(uint160(51)));
+        eventContract.registerParticipant(address(uint160(51)), systemAdmin);
         vm.stopPrank();
     }
 
@@ -140,7 +140,7 @@ contract LiberiaEventTest is Test {
         participants[2] = address(0x1003);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipants(participants);
+        eventContract.registerParticipants(participants, systemAdmin);
 
         assertTrue(eventContract.isParticipant(participants[0]));
         assertTrue(eventContract.isParticipant(participants[1]));
@@ -152,7 +152,7 @@ contract LiberiaEventTest is Test {
         address participant = address(0x9999);
 
         vm.startPrank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
         assertTrue(eventContract.isParticipant(participant));
         assertEq(eventContract.participantCount(), 1);
 
@@ -166,7 +166,7 @@ contract LiberiaEventTest is Test {
         address participant = address(0x9999);
 
         vm.startPrank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         vm.expectEmit(true, true, false, false, address(eventContract));
         emit ParticipantRemoved(participant, systemAdmin);
@@ -190,13 +190,13 @@ contract LiberiaEventTest is Test {
         assertEq(eventContract.participantCount(), 0);
 
         // Register 3 participants
-        eventContract.registerParticipant(address(0x1001));
+        eventContract.registerParticipant(address(0x1001), systemAdmin);
         assertEq(eventContract.participantCount(), 1);
 
-        eventContract.registerParticipant(address(0x1002));
+        eventContract.registerParticipant(address(0x1002), systemAdmin);
         assertEq(eventContract.participantCount(), 2);
 
-        eventContract.registerParticipant(address(0x1003));
+        eventContract.registerParticipant(address(0x1003), systemAdmin);
         assertEq(eventContract.participantCount(), 3);
 
         // Remove 1 participant
@@ -204,7 +204,7 @@ contract LiberiaEventTest is Test {
         assertEq(eventContract.participantCount(), 2);
 
         // Register another participant
-        eventContract.registerParticipant(address(0x1004));
+        eventContract.registerParticipant(address(0x1004), systemAdmin);
         assertEq(eventContract.participantCount(), 3);
 
         // Remove 2 participants
@@ -222,10 +222,10 @@ contract LiberiaEventTest is Test {
         address verifier = address(0x2222);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
 
         assertTrue(eventContract.isVerifiedForDay(participant, block.timestamp));
     }
@@ -235,7 +235,7 @@ contract LiberiaEventTest is Test {
         address verifier = address(0x2222);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // Calculate normalized day (00:00:00 UTC of that day)
         uint256 normalizedDay = (block.timestamp / 1 days) * 1 days;
@@ -244,7 +244,7 @@ contract LiberiaEventTest is Test {
         emit CheckInVerified(participant, verifier, normalizedDay);
 
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
     }
 
     function test_RevertWhenNonVerifierTriesToVerifyCheckIn() public {
@@ -252,11 +252,79 @@ contract LiberiaEventTest is Test {
         address nonVerifier = address(0x8888);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         vm.prank(systemAdmin);
         vm.expectRevert("Verifier does not have VERIFIER_ROLE");
-        eventContract.verifyCheckIn(participant, nonVerifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, nonVerifier);
+    }
+
+    function test_AllowApproverToVerifyCheckInForRegisteredParticipant() public {
+        address participant = address(0x9999);
+        address approver = address(0x1111);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant, systemAdmin);
+
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, approver);
+
+        assertTrue(eventContract.isVerifiedForDay(participant, block.timestamp));
+    }
+
+    function test_EmitCheckInVerifiedEventWhenApproverVerifiesCheckIn() public {
+        address participant = address(0x9999);
+        address approver = address(0x1111);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant, systemAdmin);
+
+        // Calculate normalized day (00:00:00 UTC of that day)
+        uint256 normalizedDay = (block.timestamp / 1 days) * 1 days;
+
+        vm.expectEmit(true, true, true, false, address(eventContract));
+        emit CheckInVerified(participant, approver, normalizedDay);
+
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, approver);
+    }
+
+    function test_SetParticipantStatusToVerifiedWhenApproverVerifiesCheckIn() public {
+        address participant = address(0x9999);
+        address approver = address(0x1111);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant, systemAdmin);
+
+        uint256 day = block.timestamp;
+
+        // Before check-in, participant should not be verified
+        assertFalse(eventContract.isVerifiedForDay(participant, day));
+
+        // Verify check-in with approver
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, approver);
+
+        // After check-in, participant should be verified for that day
+        assertTrue(eventContract.isVerifiedForDay(participant, day));
+    }
+
+    function test_IncrementCheckInCountWhenApproverVerifiesCheckIn() public {
+        address participant = address(0x9999);
+        address approver = address(0x1111);
+
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant, systemAdmin);
+
+        // Initially, check-in count should be 0
+        assertEq(eventContract.getCheckInCount(participant), 0);
+
+        // Verify check-in with approver
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, approver);
+
+        // Check-in count should be incremented
+        assertEq(eventContract.getCheckInCount(participant), 1);
     }
 
     function test_RevertWhenVerifyingCheckInForUnregisteredParticipant() public {
@@ -265,7 +333,7 @@ contract LiberiaEventTest is Test {
 
         vm.prank(systemAdmin);
         vm.expectRevert("Participant not registered");
-        eventContract.verifyCheckIn(unregisteredParticipant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(unregisteredParticipant, verifier);
     }
 
     function test_RevertWhenVerifyingCheckInBeforeEventStartTime() public {
@@ -273,13 +341,13 @@ contract LiberiaEventTest is Test {
         address verifier = address(0x2222);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // Try to verify check-in before event start time
-        uint256 beforeStartTime = block.timestamp - 1;
+        vm.warp(block.timestamp - 1);
         vm.prank(systemAdmin);
         vm.expectRevert("Check-in outside event time range");
-        eventContract.verifyCheckIn(participant, verifier, beforeStartTime);
+        eventContract.verifyCheckIn(participant, verifier);
     }
 
     function test_RevertWhenVerifyingCheckInAfterEventEndTime() public {
@@ -287,13 +355,13 @@ contract LiberiaEventTest is Test {
         address verifier = address(0x2222);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // Try to verify check-in after event end time (startTime + 7 days + 1)
-        uint256 afterEndTime = block.timestamp + 7 days + 1;
+        vm.warp(block.timestamp + 7 days + 1);
         vm.prank(systemAdmin);
         vm.expectRevert("Check-in outside event time range");
-        eventContract.verifyCheckIn(participant, verifier, afterEndTime);
+        eventContract.verifyCheckIn(participant, verifier);
     }
 
     function test_RevertWhenParticipantAlreadyCheckedInForSameDay() public {
@@ -301,18 +369,17 @@ contract LiberiaEventTest is Test {
         address verifier = address(0x2222);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // First check-in for the day (e.g., 9:00 AM)
-        uint256 morningTime = block.timestamp;
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, morningTime);
+        eventContract.verifyCheckIn(participant, verifier);
 
         // Try to check in again for the same day (e.g., 3:00 PM - 6 hours later)
-        uint256 afternoonTime = block.timestamp + 6 hours;
+        vm.warp(block.timestamp + 6 hours);
         vm.prank(systemAdmin);
         vm.expectRevert("Participant already checked in for this day");
-        eventContract.verifyCheckIn(participant, verifier, afternoonTime);
+        eventContract.verifyCheckIn(participant, verifier);
     }
 
     function test_SetParticipantStatusToVerifiedForTheDay() public {
@@ -320,7 +387,7 @@ contract LiberiaEventTest is Test {
         address verifier = address(0x2222);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         uint256 day = block.timestamp;
 
@@ -329,7 +396,7 @@ contract LiberiaEventTest is Test {
 
         // Verify check-in
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, day);
+        eventContract.verifyCheckIn(participant, verifier);
 
         // After check-in, participant should be verified for that day
         assertTrue(eventContract.isVerifiedForDay(participant, day));
@@ -340,24 +407,26 @@ contract LiberiaEventTest is Test {
         address verifier = address(0x2222);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // Initially, check-in count should be 0
         assertEq(eventContract.getCheckInCount(participant), 0);
 
         // First check-in
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
         assertEq(eventContract.getCheckInCount(participant), 1);
 
         // Second check-in (next day)
+        vm.warp(block.timestamp + 1 days);
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp + 1 days);
+        eventContract.verifyCheckIn(participant, verifier);
         assertEq(eventContract.getCheckInCount(participant), 2);
 
         // Third check-in (two days later)
+        vm.warp(block.timestamp + 1 days);
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp + 2 days);
+        eventContract.verifyCheckIn(participant, verifier);
         assertEq(eventContract.getCheckInCount(participant), 3);
     }
 
@@ -370,13 +439,13 @@ contract LiberiaEventTest is Test {
         usdc.transfer(address(eventContract), 1000 ether);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
 
         vm.prank(systemAdmin);
-        eventContract.approvePayment(participant, approver, block.timestamp);
+        eventContract.approvePayment(participant, approver);
 
         assertEq(
             uint256(eventContract.getParticipantStatusForDay(participant, block.timestamp)),
@@ -394,10 +463,10 @@ contract LiberiaEventTest is Test {
         usdc.transfer(address(eventContract), 1000 ether);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
 
         uint256 normalizedDay = (block.timestamp / 1 days) * 1 days;
 
@@ -405,7 +474,7 @@ contract LiberiaEventTest is Test {
         emit PaymentApproved(participant, approver, normalizedDay, expectedAmount);
 
         vm.prank(systemAdmin);
-        eventContract.approvePayment(participant, approver, block.timestamp);
+        eventContract.approvePayment(participant, approver);
     }
 
     function test_RevertWhenNonApproverTriesToApprovePayment() public {
@@ -414,14 +483,14 @@ contract LiberiaEventTest is Test {
         address nonApprover = address(0x8888);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
 
         vm.prank(systemAdmin);
         vm.expectRevert("Approver does not have APPROVER_ROLE");
-        eventContract.approvePayment(participant, nonApprover, block.timestamp);
+        eventContract.approvePayment(participant, nonApprover);
     }
 
     function test_RevertWhenParticipantIsNotInVerifiedStatus() public {
@@ -429,11 +498,11 @@ contract LiberiaEventTest is Test {
         address approver = address(0x1111);
 
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         vm.prank(systemAdmin);
         vm.expectRevert("Participant not in VERIFIED status");
-        eventContract.approvePayment(participant, approver, block.timestamp);
+        eventContract.approvePayment(participant, approver);
     }
 
     function test_TransferCorrectAmountOfUSDCToParticipant() public {
@@ -447,11 +516,11 @@ contract LiberiaEventTest is Test {
 
         // Register participant
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // Verify check-in
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
 
         // Record balances before payment
         uint256 participantBalanceBefore = usdc.balanceOf(participant);
@@ -459,7 +528,7 @@ contract LiberiaEventTest is Test {
 
         // Approve payment
         vm.prank(systemAdmin);
-        eventContract.approvePayment(participant, approver, block.timestamp);
+        eventContract.approvePayment(participant, approver);
 
         // Check balances after payment
         uint256 participantBalanceAfter = usdc.balanceOf(participant);
@@ -478,16 +547,16 @@ contract LiberiaEventTest is Test {
 
         // Register participant
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // Verify check-in
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
 
         // Try to approve payment without sufficient USDC balance
         vm.prank(systemAdmin);
         vm.expectRevert();
-        eventContract.approvePayment(participant, approver, block.timestamp);
+        eventContract.approvePayment(participant, approver);
     }
 
     function test_TrackTotalPaymentsMadeToEachParticipant() public {
@@ -500,30 +569,32 @@ contract LiberiaEventTest is Test {
 
         // Register participant
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // Initially, payment count should be 0
         assertEq(eventContract.getPaymentCount(participant), 0);
 
         // First payment (day 0)
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
         vm.prank(systemAdmin);
-        eventContract.approvePayment(participant, approver, block.timestamp);
+        eventContract.approvePayment(participant, approver);
         assertEq(eventContract.getPaymentCount(participant), 1);
 
         // Second payment (day 1)
+        vm.warp(block.timestamp + 1 days);
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp + 1 days);
+        eventContract.verifyCheckIn(participant, verifier);
         vm.prank(systemAdmin);
-        eventContract.approvePayment(participant, approver, block.timestamp + 1 days);
+        eventContract.approvePayment(participant, approver);
         assertEq(eventContract.getPaymentCount(participant), 2);
 
         // Third payment (day 2)
+        vm.warp(block.timestamp + 1 days);
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp + 2 days);
+        eventContract.verifyCheckIn(participant, verifier);
         vm.prank(systemAdmin);
-        eventContract.approvePayment(participant, approver, block.timestamp + 2 days);
+        eventContract.approvePayment(participant, approver);
         assertEq(eventContract.getPaymentCount(participant), 3);
     }
 
@@ -537,20 +608,20 @@ contract LiberiaEventTest is Test {
 
         // Register participant
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // Verify check-in
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, block.timestamp);
+        eventContract.verifyCheckIn(participant, verifier);
 
         // First payment approval
         vm.prank(systemAdmin);
-        eventContract.approvePayment(participant, approver, block.timestamp);
+        eventContract.approvePayment(participant, approver);
 
         // Try to approve payment again for the same day - should revert
         vm.prank(systemAdmin);
         vm.expectRevert("Participant not in VERIFIED status");
-        eventContract.approvePayment(participant, approver, block.timestamp);
+        eventContract.approvePayment(participant, approver);
     }
 
     function test_AllowBatchPaymentApprovalForMultipleParticipants() public {
@@ -569,17 +640,17 @@ contract LiberiaEventTest is Test {
 
         // Register all participants
         vm.prank(systemAdmin);
-        eventContract.registerParticipants(participants);
+        eventContract.registerParticipants(participants, systemAdmin);
 
         // Verify check-in for all participants
         for (uint256 i = 0; i < participants.length; i++) {
             vm.prank(systemAdmin);
-            eventContract.verifyCheckIn(participants[i], verifier, day);
+            eventContract.verifyCheckIn(participants[i], verifier);
         }
 
         // Batch approve payments
         vm.prank(systemAdmin);
-        eventContract.batchApprovePayments(participants, approver, day);
+        eventContract.batchApprovePayments(participants, approver);
 
         // Verify all participants received payment
         for (uint256 i = 0; i < participants.length; i++) {
@@ -596,7 +667,7 @@ contract LiberiaEventTest is Test {
         // Try to register system admin as participant - should revert
         vm.prank(systemAdmin);
         vm.expectRevert("System admins cannot be registered as participants");
-        eventContract.registerParticipant(systemAdmin);
+        eventContract.registerParticipant(systemAdmin, systemAdmin);
     }
 
     function test_RevertWhenApproverTriesToRegisterThemselvesAsParticipant() public {
@@ -605,7 +676,7 @@ contract LiberiaEventTest is Test {
         // Try to register approver as participant - should revert
         vm.prank(systemAdmin);
         vm.expectRevert("Approvers cannot be registered as participants");
-        eventContract.registerParticipant(approver);
+        eventContract.registerParticipant(approver, systemAdmin);
     }
 
     function test_RevertWhenVerifierTriesToRegisterThemselvesAsParticipant() public {
@@ -614,7 +685,7 @@ contract LiberiaEventTest is Test {
         // Try to register verifier as participant - should revert
         vm.prank(systemAdmin);
         vm.expectRevert("Verifiers cannot be registered as participants");
-        eventContract.registerParticipant(verifier);
+        eventContract.registerParticipant(verifier, systemAdmin);
     }
 
     function test_AllowParticipantWhoIsNotApproverOrVerifierToReceivePayment() public {
@@ -625,18 +696,18 @@ contract LiberiaEventTest is Test {
 
         // Register regular participant (should succeed)
         vm.prank(systemAdmin);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, systemAdmin);
 
         // Fund the contract
         usdc.mint(address(eventContract), 100 ether);
 
         // Verify check-in for the participant
         vm.prank(systemAdmin);
-        eventContract.verifyCheckIn(participant, verifier, day);
+        eventContract.verifyCheckIn(participant, verifier);
 
         // Approve payment for the participant (should succeed)
         vm.prank(systemAdmin);
-        eventContract.approvePayment(participant, approver, day);
+        eventContract.approvePayment(participant, approver);
 
         // Verify participant received payment
         assertEq(usdc.balanceOf(participant), 100 ether);
@@ -766,20 +837,20 @@ contract LiberiaEventTest is Test {
         // 1. Register participant - emits ParticipantRegistered
         vm.expectEmit(true, true, false, false);
         emit ParticipantRegistered(participant1, systemAdmin);
-        eventContract.registerParticipant(participant1);
+        eventContract.registerParticipant(participant1, systemAdmin);
 
         // 2. Verify check-in - emits CheckInVerified
         uint256 today = block.timestamp;
         uint256 normalizedDay = (today / 1 days) * 1 days;
         vm.expectEmit(true, true, true, false);
         emit CheckInVerified(participant1, verifier, normalizedDay);
-        eventContract.verifyCheckIn(participant1, verifier, today);
+        eventContract.verifyCheckIn(participant1, verifier);
 
         // 3. Approve payment - emits PaymentApproved
         usdc.transfer(address(eventContract), 1000 ether);
         vm.expectEmit(true, true, true, true);
         emit PaymentApproved(participant1, approver, normalizedDay, 100 ether);
-        eventContract.approvePayment(participant1, approver, today);
+        eventContract.approvePayment(participant1, approver);
 
         // 4. Remove participant - emits ParticipantRemoved
         vm.expectEmit(true, true, false, false);
@@ -807,7 +878,7 @@ contract LiberiaEventTest is Test {
         address verifier = address(0x2222);
         address approver = address(0x1111);
 
-        eventContract.registerParticipant(participant1);
+        eventContract.registerParticipant(participant1, systemAdmin);
 
         // CheckInVerified event includes explicit day (normalized timestamp)
         uint256 checkInTime = block.timestamp;
@@ -815,13 +886,13 @@ contract LiberiaEventTest is Test {
 
         vm.expectEmit(true, true, true, false);
         emit CheckInVerified(participant1, verifier, normalizedDay);
-        eventContract.verifyCheckIn(participant1, verifier, checkInTime);
+        eventContract.verifyCheckIn(participant1, verifier);
 
         // PaymentApproved event includes explicit day (normalized timestamp)
         usdc.transfer(address(eventContract), 1000 ether);
         vm.expectEmit(true, true, true, true);
         emit PaymentApproved(participant1, approver, normalizedDay, 100 ether);
-        eventContract.approvePayment(participant1, approver, checkInTime);
+        eventContract.approvePayment(participant1, approver);
 
         // All Solidity events inherently include block.timestamp in transaction logs
         // This test verifies that time-sensitive events (CheckInVerified, PaymentApproved)
@@ -838,20 +909,20 @@ contract LiberiaEventTest is Test {
         // ParticipantRegistered includes admin (caller) address
         vm.expectEmit(true, true, false, false);
         emit ParticipantRegistered(participant1, systemAdmin);
-        eventContract.registerParticipant(participant1);
+        eventContract.registerParticipant(participant1, systemAdmin);
 
         // CheckInVerified includes verifier (caller) address
         uint256 today = block.timestamp;
         uint256 normalizedDay = (today / 1 days) * 1 days;
         vm.expectEmit(true, true, true, false);
         emit CheckInVerified(participant1, verifier, normalizedDay);
-        eventContract.verifyCheckIn(participant1, verifier, today);
+        eventContract.verifyCheckIn(participant1, verifier);
 
         // PaymentApproved includes approver (caller) address
         usdc.transfer(address(eventContract), 1000 ether);
         vm.expectEmit(true, true, true, true);
         emit PaymentApproved(participant1, approver, normalizedDay, 100 ether);
-        eventContract.approvePayment(participant1, approver, today);
+        eventContract.approvePayment(participant1, approver);
 
         // ParticipantRemoved includes admin (caller) address
         vm.expectEmit(true, true, false, false);
@@ -879,9 +950,9 @@ contract LiberiaEventTest is Test {
         uint256 paymentAmount = 100 ether;
 
         // Register and verify participant
-        eventContract.registerParticipant(participant1);
+        eventContract.registerParticipant(participant1, systemAdmin);
         uint256 today = block.timestamp;
-        eventContract.verifyCheckIn(participant1, verifier, today);
+        eventContract.verifyCheckIn(participant1, verifier);
 
         // Fund the contract
         usdc.transfer(address(eventContract), 1000 ether);
@@ -890,7 +961,7 @@ contract LiberiaEventTest is Test {
         uint256 normalizedDay = (today / 1 days) * 1 days;
         vm.expectEmit(true, true, true, true);
         emit PaymentApproved(participant1, approver, normalizedDay, paymentAmount);
-        eventContract.approvePayment(participant1, approver, today);
+        eventContract.approvePayment(participant1, approver);
 
         // The PaymentApproved event includes:
         // - participant address (indexed for filtering)
@@ -906,16 +977,17 @@ contract LiberiaEventTest is Test {
         address verifier = address(0x2222);
 
         // Register participant
-        eventContract.registerParticipant(participant1);
+        eventContract.registerParticipant(participant1, systemAdmin);
 
         // Verify check-in on a specific day
-        uint256 checkInTime = block.timestamp + 2 days;
+        vm.warp(block.timestamp + 2 days);
+        uint256 checkInTime = block.timestamp;
         uint256 normalizedDay = (checkInTime / 1 days) * 1 days;
 
         // The CheckInVerified event should include the normalized day
         vm.expectEmit(true, true, true, false);
         emit CheckInVerified(participant1, verifier, normalizedDay);
-        eventContract.verifyCheckIn(participant1, verifier, checkInTime);
+        eventContract.verifyCheckIn(participant1, verifier);
 
         // The CheckInVerified event includes:
         // - participant address (indexed for filtering)
@@ -923,12 +995,13 @@ contract LiberiaEventTest is Test {
         // - day (indexed for filtering by date/session)
 
         // Test multiple check-ins on different days
-        uint256 nextDay = checkInTime + 1 days;
+        vm.warp(block.timestamp + 1 days);
+        uint256 nextDay = block.timestamp;
         uint256 nextNormalizedDay = (nextDay / 1 days) * 1 days;
 
         vm.expectEmit(true, true, true, false);
         emit CheckInVerified(participant1, verifier, nextNormalizedDay);
-        eventContract.verifyCheckIn(participant1, verifier, nextDay);
+        eventContract.verifyCheckIn(participant1, verifier);
     }
 
     event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);

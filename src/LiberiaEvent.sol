@@ -60,17 +60,17 @@ contract LiberiaEvent is AccessControl {
         }
     }
 
-    function registerParticipant(address participant) external onlyRole(SYSTEM_ADMIN_ROLE) {
-        _registerParticipant(participant);
+    function registerParticipant(address participant, address manager) external onlyRole(SYSTEM_ADMIN_ROLE) {
+        _registerParticipant(participant, manager);
     }
 
-    function registerParticipants(address[] memory participants) external onlyRole(SYSTEM_ADMIN_ROLE) {
+    function registerParticipants(address[] memory participants, address manager) external onlyRole(SYSTEM_ADMIN_ROLE) {
         for (uint256 i = 0; i < participants.length; i++) {
-            _registerParticipant(participants[i]);
+            _registerParticipant(participants[i], manager);
         }
     }
 
-    function _registerParticipant(address participant) private {
+    function _registerParticipant(address participant, address manager) private {
         require(participant != address(0), "Invalid participant address");
         require(!hasRole(SYSTEM_ADMIN_ROLE, participant), "System admins cannot be registered as participants");
         require(!hasRole(APPROVER_ROLE, participant), "Approvers cannot be registered as participants");
@@ -78,7 +78,7 @@ contract LiberiaEvent is AccessControl {
         require(participantCount < maxParticipants, "Max participants reached");
         isParticipant[participant] = true;
         participantCount++;
-        emit ParticipantRegistered(participant, msg.sender);
+        emit ParticipantRegistered(participant, manager);
     }
 
     function removeParticipant(address participant) external onlyRole(SYSTEM_ADMIN_ROLE) {
@@ -88,12 +88,16 @@ contract LiberiaEvent is AccessControl {
         emit ParticipantRemoved(participant, msg.sender);
     }
 
-    function verifyCheckIn(address participant, address verifier, uint256 day) external onlyRole(SYSTEM_ADMIN_ROLE) {
-        require(hasRole(VERIFIER_ROLE, verifier), "Verifier does not have VERIFIER_ROLE");
+    function verifyCheckIn(address participant, address verifier) external onlyRole(SYSTEM_ADMIN_ROLE) {
+        require(
+            hasRole(VERIFIER_ROLE, verifier) || hasRole(APPROVER_ROLE, verifier), "Verifier does not have VERIFIER_ROLE"
+        );
         require(isParticipant[participant], "Participant not registered");
-        require(day >= startTime && day <= endTime, "Check-in outside event time range");
 
-        uint256 normalizedDay = (day / 1 days) * 1 days;
+        uint256 time = block.timestamp;
+        require(time >= startTime && time <= endTime, "Check-in outside event time range");
+
+        uint256 normalizedDay = (time / 1 days) * 1 days;
 
         require(
             participantStatusForDay[participant][normalizedDay] == ParticipantStatus.NULL,
@@ -118,10 +122,11 @@ contract LiberiaEvent is AccessControl {
         return checkInCount[participant];
     }
 
-    function approvePayment(address participant, address approver, uint256 day) external onlyRole(SYSTEM_ADMIN_ROLE) {
+    function approvePayment(address participant, address approver) external onlyRole(SYSTEM_ADMIN_ROLE) {
         require(hasRole(APPROVER_ROLE, approver), "Approver does not have APPROVER_ROLE");
 
-        uint256 normalizedDay = (day / 1 days) * 1 days;
+        uint256 time = block.timestamp;
+        uint256 normalizedDay = (time / 1 days) * 1 days;
 
         require(
             participantStatusForDay[participant][normalizedDay] == ParticipantStatus.VERIFIED,
@@ -136,12 +141,14 @@ contract LiberiaEvent is AccessControl {
         emit PaymentApproved(participant, approver, normalizedDay, amountPerDay);
     }
 
-    function batchApprovePayments(address[] memory participants, address approver, uint256 day)
+    function batchApprovePayments(address[] memory participants, address approver)
         external
         onlyRole(SYSTEM_ADMIN_ROLE)
     {
         require(hasRole(APPROVER_ROLE, approver), "Approver does not have APPROVER_ROLE");
-        uint256 normalizedDay = (day / 1 days) * 1 days;
+
+        uint256 time = block.timestamp;
+        uint256 normalizedDay = (time / 1 days) * 1 days;
 
         for (uint256 i = 0; i < participants.length; i++) {
             require(

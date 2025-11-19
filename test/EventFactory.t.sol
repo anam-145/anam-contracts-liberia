@@ -327,7 +327,7 @@ contract EventFactoryTest is Test {
 
         // Step 2: Register participant
         address participant = address(0x3333);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, address(this));
 
         // Verify participant is registered
         assertTrue(eventContract.isParticipant(participant));
@@ -335,7 +335,7 @@ contract EventFactoryTest is Test {
 
         // Step 3: Verify check-in
         uint256 checkInDay = block.timestamp;
-        eventContract.verifyCheckIn(participant, verifiers[0], checkInDay);
+        eventContract.verifyCheckIn(participant, verifiers[0]);
 
         // Verify check-in was recorded
         assertEq(eventContract.getCheckInCount(participant), 1);
@@ -349,7 +349,7 @@ contract EventFactoryTest is Test {
 
         // Step 5: Approve payment
         uint256 participantBalanceBefore = usdc.balanceOf(participant);
-        eventContract.approvePayment(participant, approvers[0], checkInDay);
+        eventContract.approvePayment(participant, approvers[0]);
 
         // Verify payment was made
         assertEq(usdc.balanceOf(participant), participantBalanceBefore + amountPerDay);
@@ -383,18 +383,18 @@ contract EventFactoryTest is Test {
         address participant2 = address(0x4444);
         address participant3 = address(0x5555);
 
-        eventContract.registerParticipant(participant1);
-        eventContract.registerParticipant(participant2);
-        eventContract.registerParticipant(participant3);
+        eventContract.registerParticipant(participant1, address(this));
+        eventContract.registerParticipant(participant2, address(this));
+        eventContract.registerParticipant(participant3, address(this));
 
         // Verify all participants are registered
         assertEq(eventContract.participantCount(), 3);
 
         // Verify check-ins for all participants
         uint256 checkInDay = block.timestamp;
-        eventContract.verifyCheckIn(participant1, verifiers[0], checkInDay);
-        eventContract.verifyCheckIn(participant2, verifiers[0], checkInDay);
-        eventContract.verifyCheckIn(participant3, verifiers[0], checkInDay);
+        eventContract.verifyCheckIn(participant1, verifiers[0]);
+        eventContract.verifyCheckIn(participant2, verifiers[0]);
+        eventContract.verifyCheckIn(participant3, verifiers[0]);
 
         // Verify all check-ins were recorded
         assertEq(eventContract.getCheckInCount(participant1), 1);
@@ -404,9 +404,9 @@ contract EventFactoryTest is Test {
         // Fund contract and approve payments
         usdc.transfer(eventAddress, 1000 ether);
 
-        eventContract.approvePayment(participant1, approvers[0], checkInDay);
-        eventContract.approvePayment(participant2, approvers[0], checkInDay);
-        eventContract.approvePayment(participant3, approvers[0], checkInDay);
+        eventContract.approvePayment(participant1, approvers[0]);
+        eventContract.approvePayment(participant2, approvers[0]);
+        eventContract.approvePayment(participant3, approvers[0]);
 
         // Verify all payments were made correctly (each should have 100 ether)
         assertEq(usdc.balanceOf(participant1), 100 ether);
@@ -455,15 +455,15 @@ contract EventFactoryTest is Test {
 
         // Register one participant
         address participant = address(0x3333);
-        eventContract.registerParticipant(participant);
+        eventContract.registerParticipant(participant, address(this));
 
         // Fund contract with sufficient USDC
         usdc.transfer(eventAddress, 1000 ether);
 
         // Day 1: Check-in and payment
         uint256 day1 = block.timestamp;
-        eventContract.verifyCheckIn(participant, verifiers[0], day1);
-        eventContract.approvePayment(participant, approvers[0], day1);
+        eventContract.verifyCheckIn(participant, verifiers[0]);
+        eventContract.approvePayment(participant, approvers[0]);
 
         // Verify Day 1 state
         assertEq(eventContract.getCheckInCount(participant), 1);
@@ -474,9 +474,10 @@ contract EventFactoryTest is Test {
         );
 
         // Day 2: Check-in and payment
-        uint256 day2 = day1 + 1 days;
-        eventContract.verifyCheckIn(participant, verifiers[0], day2);
-        eventContract.approvePayment(participant, approvers[0], day2);
+        vm.warp(day1 + 1 days);
+        uint256 day2 = block.timestamp;
+        eventContract.verifyCheckIn(participant, verifiers[0]);
+        eventContract.approvePayment(participant, approvers[0]);
 
         // Verify Day 2 state
         assertEq(eventContract.getCheckInCount(participant), 2);
@@ -487,9 +488,10 @@ contract EventFactoryTest is Test {
         );
 
         // Day 3: Check-in and payment
-        uint256 day3 = day1 + 2 days;
-        eventContract.verifyCheckIn(participant, verifiers[0], day3);
-        eventContract.approvePayment(participant, approvers[0], day3);
+        vm.warp(day1 + 2 days);
+        uint256 day3 = block.timestamp;
+        eventContract.verifyCheckIn(participant, verifiers[0]);
+        eventContract.approvePayment(participant, approvers[0]);
 
         // Verify Day 3 state
         assertEq(eventContract.getCheckInCount(participant), 3);
@@ -548,8 +550,8 @@ contract EventFactoryTest is Test {
         address participantA = address(0x5555);
         address participantB = address(0x6666);
 
-        eventA.registerParticipant(participantA);
-        eventB.registerParticipant(participantB);
+        eventA.registerParticipant(participantA, address(this));
+        eventB.registerParticipant(participantB, address(this));
 
         // Verify participants are only in their respective events
         assertTrue(eventA.isParticipant(participantA));
@@ -571,7 +573,7 @@ contract EventFactoryTest is Test {
 
         // Verify check-in in Event A doesn't affect Event B
         uint256 checkInDay = block.timestamp;
-        eventA.verifyCheckIn(participantA, verifiersA[0], checkInDay);
+        eventA.verifyCheckIn(participantA, verifiersA[0]);
 
         assertEq(eventA.getCheckInCount(participantA), 1);
         assertEq(eventB.getCheckInCount(participantB), 0);
@@ -580,7 +582,7 @@ contract EventFactoryTest is Test {
         usdc.transfer(eventAddressA, 1000 ether);
         usdc.transfer(eventAddressB, 1000 ether);
 
-        eventA.approvePayment(participantA, approversA[0], checkInDay);
+        eventA.approvePayment(participantA, approversA[0]);
 
         // Participant A should have 100 ether from Event A
         assertEq(usdc.balanceOf(participantA), 100 ether);
