@@ -1006,4 +1006,37 @@ contract LiberiaEventTest is Test {
 
     event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
     event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
+
+    function test_AllowSystemAdminToWithdrawRemainingUSDC() public {
+        address recipient = address(0x5555);
+        uint256 initialBalance = 500 ether;
+
+        // Fund the event contract with USDC
+        usdc.transfer(address(eventContract), initialBalance);
+
+        // Verify initial balances
+        assertEq(usdc.balanceOf(address(eventContract)), initialBalance);
+        assertEq(usdc.balanceOf(recipient), 0);
+
+        // Withdraw as system admin
+        vm.prank(systemAdmin);
+        eventContract.withdraw(recipient);
+
+        // Verify all USDC was transferred to recipient
+        assertEq(usdc.balanceOf(address(eventContract)), 0);
+        assertEq(usdc.balanceOf(recipient), initialBalance);
+    }
+
+    function test_RevertWhenNonSystemAdminTriesToWithdraw() public {
+        address recipient = address(0x5555);
+        address nonAdmin = address(0x8888);
+
+        // Fund the event contract with USDC
+        usdc.transfer(address(eventContract), 500 ether);
+
+        // Try to withdraw as non-admin - should revert
+        vm.prank(nonAdmin);
+        vm.expectRevert();
+        eventContract.withdraw(recipient);
+    }
 }

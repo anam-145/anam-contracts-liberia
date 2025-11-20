@@ -95,7 +95,7 @@ contract LiberiaEvent is AccessControl {
         require(isParticipant[participant], "Participant not registered");
 
         uint256 time = block.timestamp;
-        require(time >= startTime && time <= endTime, "Check-in outside event time range");
+        // require(time >= startTime && time <= endTime, "Check-in outside event time range");
 
         uint256 normalizedDay = (time / 1 days) * 1 days;
 
@@ -167,5 +167,10 @@ contract LiberiaEvent is AccessControl {
 
     function getPaymentCount(address participant) external view returns (uint256) {
         return paymentCount[participant];
+    }
+
+    function withdraw(address recipient) external onlyRole(SYSTEM_ADMIN_ROLE) {
+        uint256 balance = IERC20(usdcAddress).balanceOf(address(this));
+        IERC20(usdcAddress).transfer(recipient, balance);
     }
 }
