@@ -22,8 +22,7 @@ contract DeployAll is Script {
         console.log("\n=== Deployment Summary ===");
         console.log("DIDRegistry:", address(didRegistry));
         console.log("VCStatusRegistry:", address(vcRegistry));
-        console.log("Owner:", didRegistry.owner());
-        console.log("Deployer has ISSUER_ROLE on both contracts");
+        console.log("Deployer has DEFAULT_ADMIN_ROLE and ISSUER_ROLE on both contracts");
 
         return (didRegistry, vcRegistry);
     }

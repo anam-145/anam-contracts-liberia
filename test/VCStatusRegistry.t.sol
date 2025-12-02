@@ -50,14 +50,14 @@ contract VCStatusRegistryTest is Test {
         assertEq(uint8(status), 3, "SUSPENDED should be 3");
     }
 
-    function test_ContractInheritsFromOwnable() public view {
-        address owner = registry.owner();
-        assertTrue(owner != address(0), "Contract should have an owner");
+    function test_ContractInheritsFromAccessControl() public view {
+        bool hasAdminRole = registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), deployer);
+        assertTrue(hasAdminRole, "Deployer should have DEFAULT_ADMIN_ROLE");
     }
 
-    function test_DeployerIsInitialOwner() public view {
-        address owner = registry.owner();
-        assertEq(owner, deployer, "Deployer should be the initial owner");
+    function test_DeployerIsInitialAdmin() public view {
+        bool hasAdminRole = registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), deployer);
+        assertTrue(hasAdminRole, "Deployer should have DEFAULT_ADMIN_ROLE");
     }
 
     function test_OwnerCanGrantIssuerRole() public {
@@ -455,4 +455,34 @@ contract VCStatusRegistryTest is Test {
         vm.expectRevert();
         registry.registerVC(emptyVCId);
     }
+
+    // H-1 + M-1: AccessControl RoleGranted event tests
+    function test_GrantRoleEmitsRoleGrantedEvent() public {
+        address newIssuer = address(0xABCD);
+        bytes32 issuerRole = registry.ISSUER_ROLE();
+
+        // OpenZeppelin AccessControl emits RoleGranted(role, account, sender)
+        vm.expectEmit(true, true, true, true);
+        emit RoleGranted(issuerRole, newIssuer, deployer);
+
+        registry.grantRole(issuerRole, newIssuer);
+    }
+
+    function test_RevokeRoleEmitsRoleRevokedEvent() public {
+        address issuer = address(0xABCD);
+        bytes32 issuerRole = registry.ISSUER_ROLE();
+
+        // First grant the role
+        registry.grantRole(issuerRole, issuer);
+
+        // OpenZeppelin AccessControl emits RoleRevoked(role, account, sender)
+        vm.expectEmit(true, true, true, true);
+        emit RoleRevoked(issuerRole, issuer, deployer);
+
+        registry.revokeRole(issuerRole, issuer);
+    }
+
+    // Event declarations for OpenZeppelin AccessControl
+    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
+    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
 }
