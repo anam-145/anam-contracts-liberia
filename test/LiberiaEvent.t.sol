@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {LiberiaEvent} from "../src/LiberiaEvent.sol";
+import {EventFactory} from "../src/EventFactory.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockUSDC is ERC20 {
@@ -39,7 +40,7 @@ contract LiberiaEventTest is Test {
         verifiers[0] = address(0x2222);
 
         eventContract = new LiberiaEvent(
-            address(usdc), startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, systemAdmin
+            address(usdc), startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, systemAdmin, 0
         );
     }
 
@@ -1038,5 +1039,440 @@ contract LiberiaEventTest is Test {
         vm.prank(nonAdmin);
         vm.expectRevert();
         eventContract.withdraw(recipient);
+    }
+
+    // ==================== Timezone Tests ====================
+
+    function test_InitializeEventContractWithCorrectTimezoneOffset() public view {
+        // Default event is created with timezoneOffset = 0 (UTC)
+        assertEq(eventContract.timezoneOffset(), 0);
+    }
+
+    function test_CreateEventWithPositiveTimezoneOffset() public {
+        // Create event with UTC+9 (Korea/Japan)
+        int256 koreaOffset = 9 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent koreaEvent = new LiberiaEvent(
+            address(usdc),
+            block.timestamp,
+            block.timestamp + 7 days,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            koreaOffset
+        );
+
+        assertEq(koreaEvent.timezoneOffset(), koreaOffset);
+    }
+
+    function test_CreateEventWithNegativeTimezoneOffset() public {
+        // Create event with UTC-5 (US Eastern)
+        int256 estOffset = -5 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent estEvent = new LiberiaEvent(
+            address(usdc),
+            block.timestamp,
+            block.timestamp + 7 days,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            estOffset
+        );
+
+        assertEq(estEvent.timezoneOffset(), estOffset);
+    }
+
+    function test_RevertWhenTimezoneOffsetExceedsPositiveLimit() public {
+        // UTC+15 is invalid (max is UTC+14)
+        int256 invalidOffset = 15 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        vm.expectRevert("Invalid timezone offset");
+        new LiberiaEvent(
+            address(usdc),
+            block.timestamp,
+            block.timestamp + 7 days,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            invalidOffset
+        );
+    }
+
+    function test_RevertWhenTimezoneOffsetExceedsNegativeLimit() public {
+        // UTC-13 is invalid (min is UTC-12)
+        int256 invalidOffset = -13 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        vm.expectRevert("Invalid timezone offset");
+        new LiberiaEvent(
+            address(usdc),
+            block.timestamp,
+            block.timestamp + 7 days,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            invalidOffset
+        );
+    }
+
+    function test_GetNormalizedDayReturnsUTCMidnightForZeroOffset() public view {
+        // For UTC timezone, normalized day should be UTC midnight
+        uint256 timestamp = 1701432000; // 2023-12-01 12:00:00 UTC
+        uint256 expectedNormalizedDay = 1701388800; // 2023-12-01 00:00:00 UTC
+
+        uint256 normalizedDay = eventContract.getNormalizedDay(timestamp);
+
+        assertEq(normalizedDay, expectedNormalizedDay);
+    }
+
+    function test_GetNormalizedDayReturnsCorrectValueForPositiveOffset() public {
+        // Create event with UTC+9 (Korea)
+        int256 koreaOffset = 9 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent koreaEvent = new LiberiaEvent(
+            address(usdc),
+            block.timestamp,
+            block.timestamp + 7 days,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            koreaOffset
+        );
+
+        // 2023-12-01 12:00:00 UTC = 2023-12-01 21:00:00 KST
+        // Korean midnight (2023-12-01 00:00:00 KST) = 2023-11-30 15:00:00 UTC
+        uint256 timestamp = 1701432000; // 2023-12-01 12:00:00 UTC
+        uint256 expectedNormalizedDay = 1701356400; // 2023-11-30 15:00:00 UTC (Korean Dec 1 midnight)
+
+        uint256 normalizedDay = koreaEvent.getNormalizedDay(timestamp);
+
+        assertEq(normalizedDay, expectedNormalizedDay);
+    }
+
+    function test_GetNormalizedDayReturnsCorrectValueForNegativeOffset() public {
+        // Create event with UTC-5 (US Eastern)
+        int256 estOffset = -5 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent estEvent = new LiberiaEvent(
+            address(usdc),
+            block.timestamp,
+            block.timestamp + 7 days,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            estOffset
+        );
+
+        // 2023-12-01 12:00:00 UTC = 2023-12-01 07:00:00 EST
+        // EST midnight (2023-12-01 00:00:00 EST) = 2023-12-01 05:00:00 UTC
+        uint256 timestamp = 1701432000; // 2023-12-01 12:00:00 UTC
+        uint256 expectedNormalizedDay = 1701406800; // 2023-12-01 05:00:00 UTC (EST Dec 1 midnight)
+
+        uint256 normalizedDay = estEvent.getNormalizedDay(timestamp);
+
+        assertEq(normalizedDay, expectedNormalizedDay);
+    }
+
+    function test_SameUTCTimestampDifferentLocalDaysWithDifferentTimezones() public {
+        // Test that the same UTC timestamp results in different local days
+        // depending on timezone
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        // Create UTC event
+        LiberiaEvent utcEvent = new LiberiaEvent(
+            address(usdc), block.timestamp, block.timestamp + 7 days, 100 ether, 50, approvers, verifiers, systemAdmin, 0
+        );
+
+        // Create Korea (UTC+9) event
+        LiberiaEvent koreaEvent = new LiberiaEvent(
+            address(usdc),
+            block.timestamp,
+            block.timestamp + 7 days,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            9 hours
+        );
+
+        // 2023-12-01 02:00:00 UTC
+        // In UTC: December 1st
+        // In Korea (UTC+9): December 1st 11:00:00 (still December 1st)
+        uint256 timestamp1 = 1701396000;
+
+        uint256 utcNormalizedDay1 = utcEvent.getNormalizedDay(timestamp1);
+        uint256 koreaNormalizedDay1 = koreaEvent.getNormalizedDay(timestamp1);
+
+        // Both should be December 1st in their respective timezones
+        // UTC Dec 1 00:00:00 = 1701388800
+        // Korea Dec 1 00:00:00 = UTC Nov 30 15:00:00 = 1701356400
+        assertEq(utcNormalizedDay1, 1701388800); // UTC Dec 1 midnight
+        assertEq(koreaNormalizedDay1, 1701356400); // Korea Dec 1 midnight (UTC Nov 30 15:00)
+
+        // Different normalized days!
+        assertTrue(utcNormalizedDay1 != koreaNormalizedDay1);
+    }
+
+    function test_CheckInUsesTimezoneAwareNormalizedDay() public {
+        // Create event with UTC+9 (Korea)
+        int256 koreaOffset = 9 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        // Set time range to include the warp timestamps (1701432000)
+        uint256 eventStartTime = 1701300000; // Before test timestamps
+        uint256 eventEndTime = 1701500000; // After test timestamps
+
+        LiberiaEvent koreaEvent = new LiberiaEvent(
+            address(usdc),
+            eventStartTime,
+            eventEndTime,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            koreaOffset
+        );
+
+        address participant = address(0x9999);
+
+        // Register participant
+        koreaEvent.registerParticipant(participant, systemAdmin);
+
+        // Set time to 2023-12-01 12:00:00 UTC (2023-12-01 21:00:00 KST)
+        vm.warp(1701432000);
+
+        // Verify check-in
+        koreaEvent.verifyCheckIn(participant, address(0x2222));
+
+        // Should be verified for Korean Dec 1
+        // Query with same timestamp
+        assertTrue(koreaEvent.isVerifiedForDay(participant, 1701432000));
+
+        // The normalized day should be Korean midnight
+        uint256 expectedKoreaNormalizedDay = 1701356400; // Korean Dec 1 midnight in UTC
+        assertEq(
+            uint256(koreaEvent.getParticipantStatusForDay(participant, 1701432000)),
+            uint256(LiberiaEvent.ParticipantStatus.VERIFIED)
+        );
+    }
+
+    function test_PreventDoubleCheckInOnSameLocalDay() public {
+        // Create event with UTC+9 (Korea)
+        int256 koreaOffset = 9 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        // Set time range to include the warp timestamps
+        uint256 eventStartTime = 1701300000;
+        uint256 eventEndTime = 1701500000;
+
+        LiberiaEvent koreaEvent = new LiberiaEvent(
+            address(usdc),
+            eventStartTime,
+            eventEndTime,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            koreaOffset
+        );
+
+        address participant = address(0x9999);
+        koreaEvent.registerParticipant(participant, systemAdmin);
+
+        // First check-in at Korean morning (2023-12-01 09:00 KST = 2023-12-01 00:00 UTC)
+        vm.warp(1701388800);
+        koreaEvent.verifyCheckIn(participant, address(0x2222));
+
+        // Try second check-in at Korean evening (2023-12-01 21:00 KST = 2023-12-01 12:00 UTC)
+        // Same Korean day, should fail
+        vm.warp(1701432000);
+        vm.expectRevert("Participant already checked in for this day");
+        koreaEvent.verifyCheckIn(participant, address(0x2222));
+    }
+
+    function test_AllowCheckInOnDifferentLocalDays() public {
+        // Create event with UTC+9 (Korea)
+        int256 koreaOffset = 9 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        // Set time range to include the warp timestamps (1701388800 + 2 days)
+        uint256 eventStartTime = 1701300000;
+        uint256 eventEndTime = 1701600000;
+
+        LiberiaEvent koreaEvent = new LiberiaEvent(
+            address(usdc),
+            eventStartTime,
+            eventEndTime,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            koreaOffset
+        );
+
+        address participant = address(0x9999);
+        koreaEvent.registerParticipant(participant, systemAdmin);
+
+        // First check-in on Korean Dec 1
+        // 2023-12-01 09:00 KST = 2023-12-01 00:00 UTC
+        vm.warp(1701388800);
+        koreaEvent.verifyCheckIn(participant, address(0x2222));
+        assertEq(koreaEvent.getCheckInCount(participant), 1);
+
+        // Second check-in on Korean Dec 2
+        // 2023-12-02 09:00 KST = 2023-12-02 00:00 UTC
+        vm.warp(1701388800 + 1 days);
+        koreaEvent.verifyCheckIn(participant, address(0x2222));
+        assertEq(koreaEvent.getCheckInCount(participant), 2);
+
+        // Third check-in on Korean Dec 3
+        vm.warp(1701388800 + 2 days);
+        koreaEvent.verifyCheckIn(participant, address(0x2222));
+        assertEq(koreaEvent.getCheckInCount(participant), 3);
+    }
+
+    function test_PaymentUsesTimezoneAwareNormalizedDay() public {
+        // Create event with UTC+9 (Korea)
+        int256 koreaOffset = 9 hours;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        // Set time range to include the warp timestamps
+        uint256 eventStartTime = 1701300000;
+        uint256 eventEndTime = 1701500000;
+
+        LiberiaEvent koreaEvent = new LiberiaEvent(
+            address(usdc),
+            eventStartTime,
+            eventEndTime,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            systemAdmin,
+            koreaOffset
+        );
+
+        // Fund the contract
+        usdc.transfer(address(koreaEvent), 1000 ether);
+
+        address participant = address(0x9999);
+        koreaEvent.registerParticipant(participant, systemAdmin);
+
+        // Check-in at Korean Dec 1 morning
+        vm.warp(1701388800);
+        koreaEvent.verifyCheckIn(participant, address(0x2222));
+
+        // Approve payment later same Korean day
+        vm.warp(1701432000); // Still Korean Dec 1
+        koreaEvent.approvePayment(participant, address(0x1111));
+
+        // Verify payment was made
+        assertEq(usdc.balanceOf(participant), 100 ether);
+        assertEq(koreaEvent.getPaymentCount(participant), 1);
+
+        // Status should be COMPLETED
+        assertEq(
+            uint256(koreaEvent.getParticipantStatusForDay(participant, 1701432000)),
+            uint256(LiberiaEvent.ParticipantStatus.COMPLETED)
+        );
+    }
+
+    function test_EventFactoryPassesTimezoneOffsetCorrectly() public {
+        // This test verifies EventFactory correctly passes timezone to LiberiaEvent
+        int256 koreaOffset = 9 hours;
+        EventFactory koreaFactory = new EventFactory(address(usdc), koreaOffset);
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        // Create event - timezone comes from factory
+        address eventAddress = koreaFactory.createEvent(
+            block.timestamp, block.timestamp + 7 days, 100 ether, 50, approvers, verifiers
+        );
+
+        LiberiaEvent createdEvent = LiberiaEvent(eventAddress);
+        assertEq(createdEvent.timezoneOffset(), koreaOffset);
+    }
+
+    function test_EventFactoryStoresTimezoneOffset() public {
+        int256 koreaOffset = 9 hours;
+        EventFactory koreaFactory = new EventFactory(address(usdc), koreaOffset);
+
+        assertEq(koreaFactory.timezoneOffset(), koreaOffset);
+    }
+
+    function test_RevertWhenFactoryTimezoneOffsetExceedsLimit() public {
+        vm.expectRevert("Invalid timezone offset");
+        new EventFactory(address(usdc), 15 hours); // Invalid: > 14 hours
+
+        vm.expectRevert("Invalid timezone offset");
+        new EventFactory(address(usdc), -13 hours); // Invalid: < -12 hours
     }
 }

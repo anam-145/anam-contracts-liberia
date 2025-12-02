@@ -20,6 +20,7 @@ contract LiberiaEvent is AccessControl {
     uint256 public endTime;
     uint256 public amountPerDay;
     uint256 public maxParticipants;
+    int256 public timezoneOffset;
 
     mapping(address => bool) public isParticipant;
     uint256 public participantCount;
@@ -40,13 +41,17 @@ contract LiberiaEvent is AccessControl {
         uint256 _maxParticipants,
         address[] memory _approvers,
         address[] memory _verifiers,
-        address _systemAdmin
+        address _systemAdmin,
+        int256 _timezoneOffset
     ) {
+        require(_timezoneOffset >= -12 hours && _timezoneOffset <= 14 hours, "Invalid timezone offset");
+
         usdcAddress = _usdcAddress;
         startTime = _startTime;
         endTime = _endTime;
         amountPerDay = _amountPerDay;
         maxParticipants = _maxParticipants;
+        timezoneOffset = _timezoneOffset;
 
         _grantRole(SYSTEM_ADMIN_ROLE, _systemAdmin);
         _setRoleAdmin(APPROVER_ROLE, SYSTEM_ADMIN_ROLE);
@@ -57,6 +62,22 @@ contract LiberiaEvent is AccessControl {
         }
         for (uint256 i = 0; i < _verifiers.length; i++) {
             _grantRole(VERIFIER_ROLE, _verifiers[i]);
+        }
+    }
+
+    function getNormalizedDay(uint256 timestamp) public view returns (uint256) {
+        uint256 localTime;
+        if (timezoneOffset >= 0) {
+            localTime = timestamp + uint256(timezoneOffset);
+        } else {
+            localTime = timestamp - uint256(-timezoneOffset);
+        }
+        uint256 normalizedLocal = (localTime / 1 days) * 1 days;
+
+        if (timezoneOffset >= 0) {
+            return normalizedLocal - uint256(timezoneOffset);
+        } else {
+            return normalizedLocal + uint256(-timezoneOffset);
         }
     }
 
@@ -95,9 +116,9 @@ contract LiberiaEvent is AccessControl {
         require(isParticipant[participant], "Participant not registered");
 
         uint256 time = block.timestamp;
-        // require(time >= startTime && time <= endTime, "Check-in outside event time range");
+        require(time >= startTime && time <= endTime, "Check-in outside event time range");
 
-        uint256 normalizedDay = (time / 1 days) * 1 days;
+        uint256 normalizedDay = getNormalizedDay(time);
 
         require(
             participantStatusForDay[participant][normalizedDay] == ParticipantStatus.NULL,
@@ -109,12 +130,12 @@ contract LiberiaEvent is AccessControl {
     }
 
     function isVerifiedForDay(address participant, uint256 day) external view returns (bool) {
-        uint256 normalizedDay = (day / 1 days) * 1 days;
+        uint256 normalizedDay = getNormalizedDay(day);
         return participantStatusForDay[participant][normalizedDay] == ParticipantStatus.VERIFIED;
     }
 
     function getParticipantStatusForDay(address participant, uint256 day) external view returns (ParticipantStatus) {
-        uint256 normalizedDay = (day / 1 days) * 1 days;
+        uint256 normalizedDay = getNormalizedDay(day);
         return participantStatusForDay[participant][normalizedDay];
     }
 
@@ -126,7 +147,7 @@ contract LiberiaEvent is AccessControl {
         require(hasRole(APPROVER_ROLE, approver), "Approver does not have APPROVER_ROLE");
 
         uint256 time = block.timestamp;
-        uint256 normalizedDay = (time / 1 days) * 1 days;
+        uint256 normalizedDay = getNormalizedDay(time);
 
         require(
             participantStatusForDay[participant][normalizedDay] == ParticipantStatus.VERIFIED,
@@ -148,7 +169,7 @@ contract LiberiaEvent is AccessControl {
         require(hasRole(APPROVER_ROLE, approver), "Approver does not have APPROVER_ROLE");
 
         uint256 time = block.timestamp;
-        uint256 normalizedDay = (time / 1 days) * 1 days;
+        uint256 normalizedDay = getNormalizedDay(time);
 
         for (uint256 i = 0; i < participants.length; i++) {
             require(

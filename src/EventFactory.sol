@@ -8,13 +8,16 @@ contract EventFactory is AccessControl {
     bytes32 public constant SYSTEM_ADMIN_ROLE = keccak256("SYSTEM_ADMIN_ROLE");
 
     address public usdcAddress;
+    int256 public timezoneOffset;
     address[] public events;
 
     event EventCreated(address indexed eventAddress, address indexed creator);
 
-    constructor(address _usdcAddress) {
+    constructor(address _usdcAddress, int256 _timezoneOffset) {
         require(_usdcAddress != address(0), "Invalid USDC address");
+        require(_timezoneOffset >= -12 hours && _timezoneOffset <= 14 hours, "Invalid timezone offset");
         usdcAddress = _usdcAddress;
+        timezoneOffset = _timezoneOffset;
         _grantRole(SYSTEM_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(SYSTEM_ADMIN_ROLE, SYSTEM_ADMIN_ROLE);
     }
@@ -32,7 +35,7 @@ contract EventFactory is AccessControl {
         require(maxParticipants > 0, "Invalid max participants");
 
         LiberiaEvent newEvent = new LiberiaEvent(
-            usdcAddress, startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, msg.sender
+            usdcAddress, startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, msg.sender, timezoneOffset
         );
 
         address eventAddress = address(newEvent);

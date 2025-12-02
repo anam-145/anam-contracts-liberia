@@ -14,7 +14,7 @@ contract EventFactoryTest is Test {
     function setUp() public {
         deployer = address(this);
         usdcAddress = address(0x1234);
-        factory = new EventFactory(usdcAddress);
+        factory = new EventFactory(usdcAddress, 0); // UTC timezone
     }
 
     function test_DeploySuccessfully() public view {
@@ -31,7 +31,7 @@ contract EventFactoryTest is Test {
 
     function test_RevertWhenCreatingEventWithZeroUSDCAddress() public {
         vm.expectRevert("Invalid USDC address");
-        new EventFactory(address(0));
+        new EventFactory(address(0), 0);
     }
 
     function test_RevertWhenCreatingEventWithInvalidTimeRange() public {
@@ -304,7 +304,7 @@ contract EventFactoryTest is Test {
 
         // Step 0: Deploy a mock USDC token and create factory with it
         MockUSDC usdc = new MockUSDC();
-        EventFactory testFactory = new EventFactory(address(usdc));
+        EventFactory testFactory = new EventFactory(address(usdc), 0);
 
         // Step 1: Create event via factory
         uint256 startTime = block.timestamp;
@@ -365,7 +365,7 @@ contract EventFactoryTest is Test {
 
         // Setup: Create USDC token and factory
         MockUSDC usdc = new MockUSDC();
-        EventFactory testFactory = new EventFactory(address(usdc));
+        EventFactory testFactory = new EventFactory(address(usdc), 0);
 
         // Create event
         address[] memory approvers = new address[](1);
@@ -441,7 +441,7 @@ contract EventFactoryTest is Test {
 
         // Setup
         MockUSDC usdc = new MockUSDC();
-        EventFactory testFactory = new EventFactory(address(usdc));
+        EventFactory testFactory = new EventFactory(address(usdc), 0);
 
         address[] memory approvers = new address[](1);
         approvers[0] = address(0x1111);
@@ -520,7 +520,7 @@ contract EventFactoryTest is Test {
 
         // Setup
         MockUSDC usdc = new MockUSDC();
-        EventFactory testFactory = new EventFactory(address(usdc));
+        EventFactory testFactory = new EventFactory(address(usdc), 0);
 
         // Create Event A
         address[] memory approversA = new address[](1);
