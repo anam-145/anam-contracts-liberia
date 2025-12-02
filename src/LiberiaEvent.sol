@@ -4,8 +4,9 @@ pragma solidity ^0.8.20;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract LiberiaEvent is AccessControl {
+contract LiberiaEvent is AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     enum ParticipantStatus {
@@ -125,7 +126,7 @@ contract LiberiaEvent is AccessControl {
         return checkInCount[participant];
     }
 
-    function approvePayment(address participant, address approver) external onlyRole(SYSTEM_ADMIN_ROLE) {
+    function approvePayment(address participant, address approver) external onlyRole(SYSTEM_ADMIN_ROLE) nonReentrant {
         require(hasRole(APPROVER_ROLE, approver), "Approver does not have APPROVER_ROLE");
 
         uint256 time = block.timestamp;
@@ -147,6 +148,7 @@ contract LiberiaEvent is AccessControl {
     function batchApprovePayments(address[] memory participants, address approver)
         external
         onlyRole(SYSTEM_ADMIN_ROLE)
+        nonReentrant
     {
         require(hasRole(APPROVER_ROLE, approver), "Approver does not have APPROVER_ROLE");
 
