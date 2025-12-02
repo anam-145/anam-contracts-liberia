@@ -3,8 +3,11 @@ pragma solidity ^0.8.20;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract LiberiaEvent is AccessControl {
+    using SafeERC20 for IERC20;
+
     enum ParticipantStatus {
         NULL,
         VERIFIED,
@@ -136,7 +139,7 @@ contract LiberiaEvent is AccessControl {
         participantStatusForDay[participant][normalizedDay] = ParticipantStatus.COMPLETED;
         paymentCount[participant]++;
 
-        IERC20(usdcAddress).transfer(participant, amountPerDay);
+        IERC20(usdcAddress).safeTransfer(participant, amountPerDay);
 
         emit PaymentApproved(participant, approver, normalizedDay, amountPerDay);
     }
@@ -159,7 +162,7 @@ contract LiberiaEvent is AccessControl {
             participantStatusForDay[participants[i]][normalizedDay] = ParticipantStatus.COMPLETED;
             paymentCount[participants[i]]++;
 
-            IERC20(usdcAddress).transfer(participants[i], amountPerDay);
+            IERC20(usdcAddress).safeTransfer(participants[i], amountPerDay);
 
             emit PaymentApproved(participants[i], approver, normalizedDay, amountPerDay);
         }
@@ -171,6 +174,6 @@ contract LiberiaEvent is AccessControl {
 
     function withdraw(address recipient) external onlyRole(SYSTEM_ADMIN_ROLE) {
         uint256 balance = IERC20(usdcAddress).balanceOf(address(this));
-        IERC20(usdcAddress).transfer(recipient, balance);
+        IERC20(usdcAddress).safeTransfer(recipient, balance);
     }
 }

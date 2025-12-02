@@ -15,6 +15,19 @@ contract MockUSDC is ERC20 {
     }
 }
 
+// Mock token that returns false on transfer (non-reverting failure)
+contract MockFailingUSDC {
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address, uint256) external pure returns (bool) {
+        return false; // Always returns false without reverting
+    }
+}
+
 contract LiberiaEventTest is Test {
     LiberiaEvent public eventContract;
     MockUSDC public usdc;
@@ -1038,5 +1051,101 @@ contract LiberiaEventTest is Test {
         vm.prank(nonAdmin);
         vm.expectRevert();
         eventContract.withdraw(recipient);
+    }
+
+    // C-1: SafeERC20 - Test that approvePayment reverts when transfer returns false
+    function test_RevertWhenApprovePaymentTransferReturnsFalse() public {
+        // Create event contract with failing USDC
+        MockFailingUSDC failingUsdc = new MockFailingUSDC();
+
+        uint256 startTime = block.timestamp;
+        uint256 endTime = block.timestamp + 7 days;
+        uint256 amountPerDay = 100 ether;
+        uint256 maxParticipants = 50;
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent failingEventContract = new LiberiaEvent(
+            address(failingUsdc), startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, address(this)
+        );
+
+        // Fund the contract (balance is tracked but transfer will fail)
+        failingUsdc.mint(address(failingEventContract), 1000 ether);
+
+        // Register participant
+        address participant = address(0x9999);
+        failingEventContract.registerParticipant(participant, address(this));
+
+        // Verify check-in
+        failingEventContract.verifyCheckIn(participant, address(0x2222));
+
+        // Approve payment should revert because transfer returns false
+        vm.expectRevert();
+        failingEventContract.approvePayment(participant, address(0x1111));
+    }
+
+    // C-1: SafeERC20 - Test that batchApprovePayments reverts when transfer returns false
+    function test_RevertWhenBatchApprovePaymentsTransferReturnsFalse() public {
+        // Create event contract with failing USDC
+        MockFailingUSDC failingUsdc = new MockFailingUSDC();
+
+        uint256 startTime = block.timestamp;
+        uint256 endTime = block.timestamp + 7 days;
+        uint256 amountPerDay = 100 ether;
+        uint256 maxParticipants = 50;
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent failingEventContract = new LiberiaEvent(
+            address(failingUsdc), startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, address(this)
+        );
+
+        // Fund the contract (balance is tracked but transfer will fail)
+        failingUsdc.mint(address(failingEventContract), 1000 ether);
+
+        // Register multiple participants
+        address[] memory participants = new address[](2);
+        participants[0] = address(0x9991);
+        participants[1] = address(0x9992);
+        failingEventContract.registerParticipants(participants, address(this));
+
+        // Verify check-in for all participants
+        for (uint256 i = 0; i < participants.length; i++) {
+            failingEventContract.verifyCheckIn(participants[i], address(0x2222));
+        }
+
+        // Batch approve payments should revert because transfer returns false
+        vm.expectRevert();
+        failingEventContract.batchApprovePayments(participants, address(0x1111));
+    }
+
+    // C-1: SafeERC20 - Test that withdraw reverts when transfer returns false
+    function test_RevertWhenWithdrawTransferReturnsFalse() public {
+        // Create event contract with failing USDC
+        MockFailingUSDC failingUsdc = new MockFailingUSDC();
+
+        uint256 startTime = block.timestamp;
+        uint256 endTime = block.timestamp + 7 days;
+        uint256 amountPerDay = 100 ether;
+        uint256 maxParticipants = 50;
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent failingEventContract = new LiberiaEvent(
+            address(failingUsdc), startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, address(this)
+        );
+
+        // Fund the contract (balance is tracked but transfer will fail)
+        failingUsdc.mint(address(failingEventContract), 500 ether);
+
+        // Withdraw should revert because transfer returns false
+        vm.expectRevert();
+        failingEventContract.withdraw(address(0x5555));
     }
 }
