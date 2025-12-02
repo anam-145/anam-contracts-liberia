@@ -1313,4 +1313,38 @@ contract LiberiaEventTest is Test {
         vm.expectRevert();
         eventC.batchApprovePayments(batch1, address(0x1111));
     }
+
+    // H-3: batchApprovePayments should revert early if total required balance exceeds contract balance
+    function test_RevertWhenBatchApprovePaymentsTotalExceedsBalance() public {
+        address approver = address(0x1111);
+        address verifier = address(0x2222);
+
+        // Create 5 participants
+        address[] memory participants = new address[](5);
+        participants[0] = address(0x9991);
+        participants[1] = address(0x9992);
+        participants[2] = address(0x9993);
+        participants[3] = address(0x9994);
+        participants[4] = address(0x9995);
+
+        // Fund contract with only enough for 3 payments (300 ether)
+        // but we'll try to pay 5 participants (500 ether needed)
+        usdc.mint(address(eventContract), 300 ether);
+
+        // Register all participants
+        vm.prank(systemAdmin);
+        eventContract.registerParticipants(participants, systemAdmin);
+
+        // Verify check-in for all participants
+        for (uint256 i = 0; i < participants.length; i++) {
+            vm.prank(systemAdmin);
+            eventContract.verifyCheckIn(participants[i], verifier);
+        }
+
+        // Batch approve payments should revert immediately (before processing any payment)
+        // with "Insufficient balance for batch payment" error
+        vm.prank(systemAdmin);
+        vm.expectRevert("Insufficient balance for batch payment");
+        eventContract.batchApprovePayments(participants, approver);
+    }
 }
