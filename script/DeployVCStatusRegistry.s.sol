@@ -16,7 +16,7 @@ contract DeployVCStatusRegistry is Script {
 
         console.log("VCStatusRegistry deployed at:", address(registry));
         console.log("Deployer has ISSUER_ROLE:", registry.hasRole(registry.ISSUER_ROLE(), msg.sender));
-        console.log("Owner:", registry.owner());
+        console.log("Deployer has DEFAULT_ADMIN_ROLE:", registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), msg.sender));
 
         return registry;
     }

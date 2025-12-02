@@ -15,6 +15,83 @@ contract MockUSDC is ERC20 {
     }
 }
 
+// Mock token that returns false on transfer (non-reverting failure)
+contract MockFailingUSDC {
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address, uint256) external pure returns (bool) {
+        return false; // Always returns false without reverting
+    }
+}
+
+// Mock token that attempts reentrancy attack during transfer
+contract ReentrantToken {
+    mapping(address => uint256) public balanceOf;
+    LiberiaEvent public targetContract;
+    address public attacker;
+    address public participant;
+    address public approver;
+    bool public attackEnabled;
+    uint256 public attackCount;
+    address public participant2; // Second participant for reentrancy
+    bool public useBatchAttack; // If true, attack with batchApprovePayments
+    address[] public batchParticipants;
+
+    function setTarget(LiberiaEvent _target, address _attacker, address _participant, address _approver) external {
+        targetContract = _target;
+        attacker = _attacker;
+        participant = _participant;
+        approver = _approver;
+    }
+
+    function setParticipant2(address _participant2) external {
+        participant2 = _participant2;
+    }
+
+    function setBatchParticipants(address[] memory _participants) external {
+        batchParticipants = _participants;
+    }
+
+    function enableAttack() external {
+        attackEnabled = true;
+        attackCount = 0;
+        useBatchAttack = false;
+    }
+
+    function enableBatchAttack() external {
+        attackEnabled = true;
+        attackCount = 0;
+        useBatchAttack = true;
+    }
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+
+        // Attempt reentrancy attack
+        if (attackEnabled && attackCount == 0) {
+            attackCount++;
+            if (useBatchAttack) {
+                // Try to call batchApprovePayments during transfer
+                targetContract.batchApprovePayments(batchParticipants, approver);
+            } else {
+                // Try to call approvePayment for a different participant during transfer
+                targetContract.approvePayment(participant2, approver);
+            }
+        }
+
+        return true;
+    }
+}
+
 contract LiberiaEventTest is Test {
     LiberiaEvent public eventContract;
     MockUSDC public usdc;
@@ -1018,6 +1095,9 @@ contract LiberiaEventTest is Test {
         assertEq(usdc.balanceOf(address(eventContract)), initialBalance);
         assertEq(usdc.balanceOf(recipient), 0);
 
+        // Warp time past event end
+        vm.warp(block.timestamp + 8 days);
+
         // Withdraw as system admin
         vm.prank(systemAdmin);
         eventContract.withdraw(recipient);
@@ -1037,6 +1117,316 @@ contract LiberiaEventTest is Test {
         // Try to withdraw as non-admin - should revert
         vm.prank(nonAdmin);
         vm.expectRevert();
+        eventContract.withdraw(recipient);
+    }
+
+    // C-1: SafeERC20 - Test that approvePayment reverts when transfer returns false
+    function test_RevertWhenApprovePaymentTransferReturnsFalse() public {
+        // Create event contract with failing USDC
+        MockFailingUSDC failingUsdc = new MockFailingUSDC();
+
+        uint256 startTime = block.timestamp;
+        uint256 endTime = block.timestamp + 7 days;
+        uint256 amountPerDay = 100 ether;
+        uint256 maxParticipants = 50;
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent failingEventContract = new LiberiaEvent(
+            address(failingUsdc), startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, address(this)
+        );
+
+        // Fund the contract (balance is tracked but transfer will fail)
+        failingUsdc.mint(address(failingEventContract), 1000 ether);
+
+        // Register participant
+        address participant = address(0x9999);
+        failingEventContract.registerParticipant(participant, address(this));
+
+        // Verify check-in
+        failingEventContract.verifyCheckIn(participant, address(0x2222));
+
+        // Approve payment should revert because transfer returns false
+        vm.expectRevert();
+        failingEventContract.approvePayment(participant, address(0x1111));
+    }
+
+    // C-1: SafeERC20 - Test that batchApprovePayments reverts when transfer returns false
+    function test_RevertWhenBatchApprovePaymentsTransferReturnsFalse() public {
+        // Create event contract with failing USDC
+        MockFailingUSDC failingUsdc = new MockFailingUSDC();
+
+        uint256 startTime = block.timestamp;
+        uint256 endTime = block.timestamp + 7 days;
+        uint256 amountPerDay = 100 ether;
+        uint256 maxParticipants = 50;
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent failingEventContract = new LiberiaEvent(
+            address(failingUsdc), startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, address(this)
+        );
+
+        // Fund the contract (balance is tracked but transfer will fail)
+        failingUsdc.mint(address(failingEventContract), 1000 ether);
+
+        // Register multiple participants
+        address[] memory participants = new address[](2);
+        participants[0] = address(0x9991);
+        participants[1] = address(0x9992);
+        failingEventContract.registerParticipants(participants, address(this));
+
+        // Verify check-in for all participants
+        for (uint256 i = 0; i < participants.length; i++) {
+            failingEventContract.verifyCheckIn(participants[i], address(0x2222));
+        }
+
+        // Batch approve payments should revert because transfer returns false
+        vm.expectRevert();
+        failingEventContract.batchApprovePayments(participants, address(0x1111));
+    }
+
+    // C-1: SafeERC20 - Test that withdraw reverts when transfer returns false
+    function test_RevertWhenWithdrawTransferReturnsFalse() public {
+        // Create event contract with failing USDC
+        MockFailingUSDC failingUsdc = new MockFailingUSDC();
+
+        uint256 startTime = block.timestamp;
+        uint256 endTime = block.timestamp + 7 days;
+        uint256 amountPerDay = 100 ether;
+        uint256 maxParticipants = 50;
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent failingEventContract = new LiberiaEvent(
+            address(failingUsdc), startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, address(this)
+        );
+
+        // Fund the contract (balance is tracked but transfer will fail)
+        failingUsdc.mint(address(failingEventContract), 500 ether);
+
+        // Withdraw should revert because transfer returns false
+        vm.expectRevert();
+        failingEventContract.withdraw(address(0x5555));
+    }
+
+    // C-2: ReentrancyGuard - Test that approvePayment is protected against reentrancy
+    // Note: The current implementation uses Check-Effects-Interactions pattern which provides
+    // some protection. However, explicit ReentrancyGuard should be added as defense in depth.
+    // This test verifies that reentrancy attempts are blocked.
+    function test_RevertWhenApprovePaymentReentrancyAttack() public {
+        // Create reentrant token that will try to re-enter during transfer
+        ReentrantToken reentrantToken = new ReentrantToken();
+
+        uint256 startTime = block.timestamp;
+        uint256 endTime = block.timestamp + 7 days;
+        uint256 amountPerDay = 100 ether;
+        uint256 maxParticipants = 50;
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        // Make the reentrant token the system admin so it can attempt reentrancy
+        LiberiaEvent reentrantEventContract = new LiberiaEvent(
+            address(reentrantToken),
+            startTime,
+            endTime,
+            amountPerDay,
+            maxParticipants,
+            approvers,
+            verifiers,
+            address(reentrantToken) // Token is the system admin
+        );
+
+        // Register two participants (as token which is admin)
+        address participant1 = address(0x9991);
+        address participant2 = address(0x9992);
+        vm.startPrank(address(reentrantToken));
+        reentrantEventContract.registerParticipant(participant1, address(reentrantToken));
+        reentrantEventContract.registerParticipant(participant2, address(reentrantToken));
+
+        // Verify check-in for both participants
+        reentrantEventContract.verifyCheckIn(participant1, address(0x2222));
+        reentrantEventContract.verifyCheckIn(participant2, address(0x2222));
+        vm.stopPrank();
+
+        // Fund contract with enough for multiple payments
+        reentrantToken.mint(address(reentrantEventContract), 1000 ether);
+
+        // Setup reentrancy attack - the token will try to call approvePayment for participant2
+        // during the transfer to participant1
+        reentrantToken.setTarget(reentrantEventContract, address(reentrantToken), participant1, address(0x1111));
+        reentrantToken.setParticipant2(participant2);
+        reentrantToken.enableAttack();
+
+        // The reentrancy attempt during safeTransfer should be blocked
+        // Either by ReentrancyGuard or by the existing state change protection
+        vm.prank(address(reentrantToken));
+        vm.expectRevert();
+        reentrantEventContract.approvePayment(participant1, address(0x1111));
+    }
+
+    // C-2: ReentrancyGuard - Test that batchApprovePayments reverts on reentrancy attack
+    function test_RevertWhenBatchApprovePaymentsReentrancyAttack() public {
+        ReentrantToken token = new ReentrantToken();
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        LiberiaEvent eventC = new LiberiaEvent(
+            address(token),
+            block.timestamp,
+            block.timestamp + 7 days,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            address(token)
+        );
+
+        // Register participants
+        address p1 = address(0x9991);
+        address p2 = address(0x9992);
+        address p3 = address(0x9993);
+
+        vm.startPrank(address(token));
+        eventC.registerParticipant(p1, address(token));
+        eventC.registerParticipant(p2, address(token));
+        eventC.registerParticipant(p3, address(token));
+        eventC.verifyCheckIn(p1, address(0x2222));
+        eventC.verifyCheckIn(p2, address(0x2222));
+        eventC.verifyCheckIn(p3, address(0x2222));
+        vm.stopPrank();
+
+        token.mint(address(eventC), 1000 ether);
+
+        // Setup attack: during batch for [p1], try to batch [p2, p3]
+        address[] memory batch1 = new address[](1);
+        batch1[0] = p1;
+        address[] memory batch2 = new address[](2);
+        batch2[0] = p2;
+        batch2[1] = p3;
+
+        token.setTarget(eventC, address(token), p1, address(0x1111));
+        token.setBatchParticipants(batch2);
+        token.enableBatchAttack();
+
+        vm.prank(address(token));
+        vm.expectRevert();
+        eventC.batchApprovePayments(batch1, address(0x1111));
+    }
+
+    // H-3: batchApprovePayments should revert early if total required balance exceeds contract balance
+    function test_RevertWhenBatchApprovePaymentsTotalExceedsBalance() public {
+        address approver = address(0x1111);
+        address verifier = address(0x2222);
+
+        // Create 5 participants
+        address[] memory participants = new address[](5);
+        participants[0] = address(0x9991);
+        participants[1] = address(0x9992);
+        participants[2] = address(0x9993);
+        participants[3] = address(0x9994);
+        participants[4] = address(0x9995);
+
+        // Fund contract with only enough for 3 payments (300 ether)
+        // but we'll try to pay 5 participants (500 ether needed)
+        usdc.mint(address(eventContract), 300 ether);
+
+        // Register all participants
+        vm.prank(systemAdmin);
+        eventContract.registerParticipants(participants, systemAdmin);
+
+        // Verify check-in for all participants
+        for (uint256 i = 0; i < participants.length; i++) {
+            vm.prank(systemAdmin);
+            eventContract.verifyCheckIn(participants[i], verifier);
+        }
+
+        // Batch approve payments should revert immediately (before processing any payment)
+        // with "Insufficient balance for batch payment" error
+        vm.prank(systemAdmin);
+        vm.expectRevert("Insufficient balance for batch payment");
+        eventContract.batchApprovePayments(participants, approver);
+    }
+
+    // M-2: removeParticipant should reset checkInCount
+    function test_ResetCheckInCountWhenRemovingParticipant() public {
+        address verifier = address(0x2222);
+        address participant = address(0x9999);
+
+        // Register participant
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant, systemAdmin);
+
+        // Verify check-in to increment checkInCount
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier);
+
+        // Verify checkInCount is 1
+        assertEq(eventContract.getCheckInCount(participant), 1);
+
+        // Remove participant
+        vm.prank(systemAdmin);
+        eventContract.removeParticipant(participant);
+
+        // checkInCount should be reset to 0
+        assertEq(eventContract.getCheckInCount(participant), 0);
+    }
+
+    // M-2: removeParticipant should reset paymentCount
+    function test_ResetPaymentCountWhenRemovingParticipant() public {
+        address approver = address(0x1111);
+        address verifier = address(0x2222);
+        address participant = address(0x9999);
+
+        // Fund contract
+        usdc.mint(address(eventContract), 100 ether);
+
+        // Register participant
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant, systemAdmin);
+
+        // Verify check-in
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier);
+
+        // Approve payment to increment paymentCount
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver);
+
+        // Verify paymentCount is 1
+        assertEq(eventContract.getPaymentCount(participant), 1);
+
+        // Remove participant
+        vm.prank(systemAdmin);
+        eventContract.removeParticipant(participant);
+
+        // paymentCount should be reset to 0
+        assertEq(eventContract.getPaymentCount(participant), 0);
+    }
+
+    // M-5: withdraw should only be allowed after event ends
+    function test_RevertWhenWithdrawCalledDuringEvent() public {
+        address recipient = address(0x5555);
+
+        // Fund the event contract with USDC
+        usdc.mint(address(eventContract), 500 ether);
+
+        // Event is ongoing (block.timestamp is within startTime and endTime)
+        // startTime = block.timestamp, endTime = block.timestamp + 7 days
+
+        // Try to withdraw during event - should revert
+        vm.prank(systemAdmin);
+        vm.expectRevert("Event has not ended");
         eventContract.withdraw(recipient);
     }
 }

@@ -6,6 +6,8 @@ import {LiberiaEvent} from "./LiberiaEvent.sol";
 
 contract EventFactory is AccessControl {
     bytes32 public constant SYSTEM_ADMIN_ROLE = keccak256("SYSTEM_ADMIN_ROLE");
+    uint256 public constant MAX_APPROVERS = 20;
+    uint256 public constant MAX_VERIFIERS = 20;
 
     address public usdcAddress;
     address[] public events;
@@ -30,6 +32,8 @@ contract EventFactory is AccessControl {
         require(endTime > startTime, "Invalid time range");
         require(amountPerDay > 0, "Invalid amount per day");
         require(maxParticipants > 0, "Invalid max participants");
+        require(approvers.length <= MAX_APPROVERS, "Too many approvers");
+        require(verifiers.length <= MAX_VERIFIERS, "Too many verifiers");
 
         LiberiaEvent newEvent = new LiberiaEvent(
             usdcAddress, startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers, msg.sender
