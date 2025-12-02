@@ -1095,6 +1095,9 @@ contract LiberiaEventTest is Test {
         assertEq(usdc.balanceOf(address(eventContract)), initialBalance);
         assertEq(usdc.balanceOf(recipient), 0);
 
+        // Warp time past event end
+        vm.warp(block.timestamp + 8 days);
+
         // Withdraw as system admin
         vm.prank(systemAdmin);
         eventContract.withdraw(recipient);
@@ -1402,5 +1405,21 @@ contract LiberiaEventTest is Test {
 
         // paymentCount should be reset to 0
         assertEq(eventContract.getPaymentCount(participant), 0);
+    }
+
+    // M-5: withdraw should only be allowed after event ends
+    function test_RevertWhenWithdrawCalledDuringEvent() public {
+        address recipient = address(0x5555);
+
+        // Fund the event contract with USDC
+        usdc.mint(address(eventContract), 500 ether);
+
+        // Event is ongoing (block.timestamp is within startTime and endTime)
+        // startTime = block.timestamp, endTime = block.timestamp + 7 days
+
+        // Try to withdraw during event - should revert
+        vm.prank(systemAdmin);
+        vm.expectRevert("Event has not ended");
+        eventContract.withdraw(recipient);
     }
 }

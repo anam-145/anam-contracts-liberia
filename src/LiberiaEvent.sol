@@ -181,6 +181,7 @@ contract LiberiaEvent is AccessControl, ReentrancyGuard {
     }
 
     function withdraw(address recipient) external onlyRole(SYSTEM_ADMIN_ROLE) {
+        require(block.timestamp > endTime, "Event has not ended");
         uint256 balance = IERC20(usdcAddress).balanceOf(address(this));
         IERC20(usdcAddress).safeTransfer(recipient, balance);
     }
