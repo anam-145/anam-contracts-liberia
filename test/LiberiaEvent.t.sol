@@ -1282,7 +1282,14 @@ contract LiberiaEventTest is Test {
         verifiers[0] = address(0x2222);
 
         LiberiaEvent eventC = new LiberiaEvent(
-            address(token), block.timestamp, block.timestamp + 7 days, 100 ether, 50, approvers, verifiers, address(token)
+            address(token),
+            block.timestamp,
+            block.timestamp + 7 days,
+            100 ether,
+            50,
+            approvers,
+            verifiers,
+            address(token)
         );
 
         // Register participants
