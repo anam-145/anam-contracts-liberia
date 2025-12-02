@@ -89,6 +89,8 @@ contract LiberiaEvent is AccessControl, ReentrancyGuard {
         require(isParticipant[participant], "Participant not registered");
         isParticipant[participant] = false;
         participantCount--;
+        delete checkInCount[participant];
+        delete paymentCount[participant];
         emit ParticipantRemoved(participant, msg.sender);
     }
 

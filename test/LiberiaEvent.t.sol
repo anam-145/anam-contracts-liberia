@@ -1347,4 +1347,60 @@ contract LiberiaEventTest is Test {
         vm.expectRevert("Insufficient balance for batch payment");
         eventContract.batchApprovePayments(participants, approver);
     }
+
+    // M-2: removeParticipant should reset checkInCount
+    function test_ResetCheckInCountWhenRemovingParticipant() public {
+        address verifier = address(0x2222);
+        address participant = address(0x9999);
+
+        // Register participant
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant, systemAdmin);
+
+        // Verify check-in to increment checkInCount
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier);
+
+        // Verify checkInCount is 1
+        assertEq(eventContract.getCheckInCount(participant), 1);
+
+        // Remove participant
+        vm.prank(systemAdmin);
+        eventContract.removeParticipant(participant);
+
+        // checkInCount should be reset to 0
+        assertEq(eventContract.getCheckInCount(participant), 0);
+    }
+
+    // M-2: removeParticipant should reset paymentCount
+    function test_ResetPaymentCountWhenRemovingParticipant() public {
+        address approver = address(0x1111);
+        address verifier = address(0x2222);
+        address participant = address(0x9999);
+
+        // Fund contract
+        usdc.mint(address(eventContract), 100 ether);
+
+        // Register participant
+        vm.prank(systemAdmin);
+        eventContract.registerParticipant(participant, systemAdmin);
+
+        // Verify check-in
+        vm.prank(systemAdmin);
+        eventContract.verifyCheckIn(participant, verifier);
+
+        // Approve payment to increment paymentCount
+        vm.prank(systemAdmin);
+        eventContract.approvePayment(participant, approver);
+
+        // Verify paymentCount is 1
+        assertEq(eventContract.getPaymentCount(participant), 1);
+
+        // Remove participant
+        vm.prank(systemAdmin);
+        eventContract.removeParticipant(participant);
+
+        // paymentCount should be reset to 0
+        assertEq(eventContract.getPaymentCount(participant), 0);
+    }
 }
