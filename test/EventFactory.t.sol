@@ -598,6 +598,46 @@ contract EventFactoryTest is Test {
         assertEq(eventA.getPaymentCount(participantA), 1);
         assertEq(eventB.getPaymentCount(participantB), 0);
     }
+
+    // M-4: createEvent should revert when approvers array exceeds max size
+    function test_RevertWhenApproversArrayExceedsMaxSize() public {
+        uint256 startTime = block.timestamp;
+        uint256 endTime = block.timestamp + 7 days;
+        uint256 amountPerDay = 100 ether;
+        uint256 maxParticipants = 50;
+
+        // Create approvers array with 21 elements (exceeds max of 20)
+        address[] memory approvers = new address[](21);
+        for (uint256 i = 0; i < 21; i++) {
+            approvers[i] = address(uint160(0x1000 + i));
+        }
+
+        address[] memory verifiers = new address[](1);
+        verifiers[0] = address(0x2222);
+
+        vm.expectRevert("Too many approvers");
+        factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers);
+    }
+
+    // M-4: createEvent should revert when verifiers array exceeds max size
+    function test_RevertWhenVerifiersArrayExceedsMaxSize() public {
+        uint256 startTime = block.timestamp;
+        uint256 endTime = block.timestamp + 7 days;
+        uint256 amountPerDay = 100 ether;
+        uint256 maxParticipants = 50;
+
+        address[] memory approvers = new address[](1);
+        approvers[0] = address(0x1111);
+
+        // Create verifiers array with 21 elements (exceeds max of 20)
+        address[] memory verifiers = new address[](21);
+        for (uint256 i = 0; i < 21; i++) {
+            verifiers[i] = address(uint160(0x2000 + i));
+        }
+
+        vm.expectRevert("Too many verifiers");
+        factory.createEvent(startTime, endTime, amountPerDay, maxParticipants, approvers, verifiers);
+    }
 }
 
 contract MockUSDC is ERC20 {
